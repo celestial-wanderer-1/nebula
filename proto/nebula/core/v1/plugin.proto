@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+enum PluginOrigin {
+  PLUGIN_ORIGIN_UNSPECIFIED = 0;
+  // First-party modules declared in the core manifest (D111).
+  PLUGIN_ORIGIN_CORE = 1;
+  PLUGIN_ORIGIN_PLUGIN = 2;
+}
+
+// ABI fingerprint carried by every manifest (D45, D131).
+message AbiFingerprint {
+  string compiler = 1;
+  string stdlib = 2;
+  string gpu_runtime = 3;
+  string nebula_abi = 4;
+}
+
+enum ExtensionKind {
+  EXTENSION_KIND_UNSPECIFIED = 0;
+  EXTENSION_KIND_SOLVER = 1;
+  EXTENSION_KIND_ADAPTER = 2;
+  EXTENSION_KIND_POST_OP = 3;
+  EXTENSION_KIND_GEOMETRY_COMPONENT = 4;
+  EXTENSION_KIND_CONCEPT = 5;
+  EXTENSION_KIND_OPTIMIZER = 6;
+  EXTENSION_KIND_OBJECTIVE = 7;
+}
+
+message Extension {
+  string id = 1;
+  ExtensionKind kind = 2;
+  string display_name = 3;
+  // Calculation type, for example "equilibrium"; groups the workflow palette.
+  string calculation_type = 4;
+  // Fully qualified name of the config message.
+  string config_message = 5;
+  repeated string sub_contracts = 6;
+}
+
+enum SmokeResult {
+  SMOKE_RESULT_UNSPECIFIED = 0;
+  SMOKE_RESULT_PASSED = 1;
+  SMOKE_RESULT_FAILED = 2;
+  SMOKE_RESULT_NOT_RUN = 3;
+}
+
+// Smoke V&V status per GPU model (D61, D140).
+message SmokeStatus {
+  string gpu_model = 1;
+  SmokeResult result = 2;
+  string detail = 3;
+}
+
+message PluginInfo {
+  string id = 1;
+  string version = 2;
+  PluginOrigin origin = 3;
+  AbiFingerprint abi = 4;
+  string so_hash = 5;
+  repeated Extension extensions = 6;
+  // FileDescriptorSet of the plugin's own .proto files, excluding core files.
+  // Empty for core, whose descriptors are compiled into every client (D54, D133).
+  bytes descriptor_set = 7;
+  repeated SmokeStatus smoke = 8;
+}
+
+message ListPluginsResponse {
+  repeated PluginInfo plugins = 1;
+}

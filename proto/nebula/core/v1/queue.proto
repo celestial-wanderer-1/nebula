@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+// Queue counts shared across projects (D100, D102).
+message QueueSummary {
+  uint32 queued = 1;
+  uint32 preparing = 2;
+  uint32 running = 3;
+  uint32 gpus_total = 4;
+  uint32 gpus_busy = 5;
+}
+
+// Event on /ws/queue. Run state changes join this message in P4.
+message QueueEvent {
+  oneof event {
+    QueueSummary summary = 1;
+  }
+}

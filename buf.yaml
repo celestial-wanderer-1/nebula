@@ -1,0 +1,11 @@
+version: v2
+modules:
+  - path: proto
+  # Fake plugin used by web/ tests and the mock backend (docs/UI.md Section 7).
+  - path: web/test-fixtures/proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

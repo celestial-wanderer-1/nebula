@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+// Typed failure reasons of A§3.7 and A§6.8.
+enum FailureReason {
+  FAILURE_REASON_UNSPECIFIED = 0;
+  FAILURE_REASON_OOM = 1;
+  FAILURE_REASON_NAN = 2;
+  FAILURE_REASON_DIVERGED = 3;
+  FAILURE_REASON_PLUGIN_ERROR = 4;
+  FAILURE_REASON_GEOMETRY_FAILED = 5;
+  FAILURE_REASON_CRASHED = 6;
+  FAILURE_REASON_SUPERVISOR_LOST = 7;
+}
+
+// Provenance tags shown on Runs (A§13.3).
+enum ProvenanceTag {
+  PROVENANCE_TAG_UNSPECIFIED = 0;
+  // Re-executed on a newer build (D62).
+  PROVENANCE_TAG_REBUILT = 1;
+  // Resumed across builds (D130).
+  PROVENANCE_TAG_MIXED_BUILDS = 2;
+  // Imported with a build that does not match this installation (D100, D149).
+  PROVENANCE_TAG_NOT_REPRODUCIBLE_HERE = 3;
+}

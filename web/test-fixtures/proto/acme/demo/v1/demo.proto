@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+// Fake out-of-core plugin "acme.demo" used by web/ tests and the mock backend
+// (docs/UI.md Section 7). Its package carries the plugin ID and major version
+// (D133). DemoSolverConfig covers every row of the field-to-widget table of
+// docs/UI.md Section 5.
+package acme.demo.v1;
+
+import "google/protobuf/descriptor.proto";
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+
+// Simulates a core option added after the UI build: its number is in the core
+// range, so the UI cannot know what it means and renders the field read-only.
+extend google.protobuf.FieldOptions {
+  string future_core_option = 50999;
+}
+
+enum Method {
+  METHOD_UNSPECIFIED = 0;
+  METHOD_DIRECT_SUM = 1 [(nebula.core.v1.label) = "Direct sum"];
+  METHOD_FMM = 2 [(nebula.core.v1.label) = "Fast multipole"];
+}
+
+message FixedBoundary {
+  double minor_radius = 1 [(nebula.core.v1.quantity) = {
+    unit: "m"
+    min: 0
+  }];
+  double elongation = 2 [(nebula.core.v1.quantity) = {
+    min: 1
+    max: 3
+  }];
+}
+
+message FreeBoundary {
+  uint32 coil_iterations = 1 [(nebula.core.v1.quantity) = {min: 1}];
+}
+
+message Grid {
+  uint32 nr = 1 [(nebula.core.v1.quantity) = {
+    min: 2
+    max: 4096
+  }];
+  uint32 nz = 2 [(nebula.core.v1.quantity) = {
+    min: 2
+    max: 4096
+  }];
+}
+
+message Probe {
+  string name = 1;
+  double r = 2 [(nebula.core.v1.quantity) = {unit: "m"}];
+  double z = 3 [(nebula.core.v1.quantity) = {unit: "m"}];
+}
+
+message DemoSolverConfig {
+  double tolerance = 1 [
+    (nebula.core.v1.quantity) = {
+      min: 1e-14
+      max: 1e-2
+    },
+    (nebula.core.v1.ui) = {
+      label: "Tolerance"
+      group: "Convergence"
+      order: 1
+      default_json: "1e-8"
+    }
+  ];
+  uint32 max_iterations = 2 [
+    (nebula.core.v1.quantity) = {
+      min: 1
+      max: 100000
+    },
+    (nebula.core.v1.ui) = {
+      group: "Convergence"
+      order: 2
+      default_json: "200"
+    }
+  ];
+  double coil_current = 3 [
+    (nebula.core.v1.quantity) = {
+      unit: "A"
+      min: -1e7
+      max: 1e7
+      design_variable: true
+    },
+    (nebula.core.v1.ui) = {order: -1}
+  ];
+  double edge_temperature = 4 [(nebula.core.v1.quantity) = {
+    unit: "eV"
+    min: 0
+  }];
+  bool use_symmetry = 5 [(nebula.core.v1.ui) = {
+    label: "Use symmetry"
+    help: "Solve one field period and replicate."
+  }];
+  string label = 6;
+  Method method = 7 [(nebula.core.v1.ui) = {default_json: "\"METHOD_FMM\""}];
+  oneof boundary {
+    FixedBoundary fixed = 8;
+    FreeBoundary free = 9;
+  }
+  Grid grid = 10;
+  repeated double radial_knots = 11 [(nebula.core.v1.quantity) = {unit: "m"}];
+  repeated Probe probes = 12;
+  nebula.core.v1.EntityRef geometry = 13 [(nebula.core.v1.ui) = {ref_kind: ENTITY_KIND_GEOMETRY}];
+  nebula.core.v1.DatasetRef initial_guess = 14;
+  string internal_key = 15 [(nebula.core.v1.ui) = {hidden: true}];
+  map<string, double> extra = 16;
+  double future_field = 17 [(future_core_option) = "new widget"];
+}
+
+// A plugin GeometryComponent shape (A§10.1).
+message SaddleCoil {
+  double width = 1 [(nebula.core.v1.quantity) = {
+    unit: "m"
+    min: 0
+    design_variable: true
+  }];
+  double height = 2 [(nebula.core.v1.quantity) = {
+    unit: "m"
+    min: 0
+  }];
+  double toroidal_extent = 3 [
+    (nebula.core.v1.quantity) = {
+      unit: "rad"
+      min: 0
+      max: 6.283185307179586
+    },
+    (nebula.core.v1.ui) = {label: "Toroidal extent"}
+  ];
+  uint32 turns = 4 [(nebula.core.v1.quantity) = {min: 1}];
+}

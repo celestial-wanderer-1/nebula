@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/options.proto";
+
+// A circular filament coil centred on the z axis, the simplest first-party
+// component shape (A§10.1). Further shapes arrive with the geometry editor.
+message CircularFilament {
+  double major_radius = 1 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+      design_variable: true
+    },
+    (ui) = {
+      label: "Major radius"
+      order: 1
+    }
+  ];
+  double height = 2 [
+    (quantity) = {
+      unit: "m"
+      design_variable: true
+    },
+    (ui) = {
+      label: "Height (z)"
+      order: 2
+    }
+  ];
+  uint32 turns = 3 [
+    (quantity) = {min: 1},
+    (ui) = {
+      order: 3
+      default_json: "1"
+    }
+  ];
+  uint32 segments = 4 [
+    (quantity) = {
+      min: 8
+      max: 100000
+    },
+    (ui) = {
+      group: "Discretization"
+      default_json: "128"
+    }
+  ];
+}

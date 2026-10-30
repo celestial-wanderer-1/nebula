@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// The concept kit a project was created from (D113).
+message ConceptRef {
+  string concept_id = 1;
+  string version = 2;
+}
+
+message ProjectSettings {
+  // Reject cache hits whose producer hardware differs (D78, D125).
+  bool strict_cache = 1;
+}
+
+message Project {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  ConceptRef concept = 4;
+  ProjectSettings settings = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  uint32 run_count = 8;
+  // Imported Runs whose build does not match this installation (D100, D149).
+  uint32 non_reproducible_run_count = 9;
+}
+
+message ListProjectsResponse {
+  repeated Project projects = 1;
+}
+
+enum TemplateKind {
+  TEMPLATE_KIND_UNSPECIFIED = 0;
+  // Starter project of a concept kit (D86).
+  TEMPLATE_KIND_CONCEPT_STARTER = 1;
+  // A project saved as a template by the user (D86).
+  TEMPLATE_KIND_SAVED = 2;
+}
+
+message Template {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  TemplateKind kind = 4;
+  ConceptRef concept = 5;
+}
+
+message ListTemplatesResponse {
+  repeated Template templates = 1;
+}
+
+message CreateProjectRequest {
+  string name = 1;
+  string description = 2;
+  string template_id = 3;
+}
+
+message SaveTemplateRequest {
+  string name = 1;
+  string description = 2;
+}
+
+enum IssueSeverity {
+  ISSUE_SEVERITY_UNSPECIFIED = 0;
+  ISSUE_SEVERITY_WARNING = 1;
+  ISSUE_SEVERITY_ERROR = 2;
+}
+
+message ValidationIssue {
+  IssueSeverity severity = 1;
+  // Location inside the snapshot, for example "runs/r-12/provenance".
+  string path = 2;
+  string message = 3;
+}
+
+// Response of POST /projects/import. project is set when the import succeeded.
+message ImportProjectResponse {
+  Project project = 1;
+  repeated ValidationIssue issues = 2;
+}

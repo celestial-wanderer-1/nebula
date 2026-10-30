@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/descriptor.proto";
+import "nebula/core/v1/entity.proto";
+
+// Annotations of a numeric field (A§5.8). Any annotated field is selectable
+// as a design variable in a study when design_variable is set (D81).
+message Quantity {
+  // SI unit tag; temperatures in eV (D46). Empty for dimensionless values.
+  string unit = 1;
+  optional double min = 2;
+  optional double max = 3;
+  // Characteristic scale of the value, used by optimizers.
+  optional double scale = 4;
+  bool design_variable = 5;
+}
+
+// Widget override for a generated form field (D87).
+enum Widget {
+  WIDGET_UNSPECIFIED = 0;
+  WIDGET_TEXTAREA = 1;
+  WIDGET_SLIDER = 2;
+  WIDGET_RADIO = 3;
+  WIDGET_TABLE = 4;
+}
+
+// UI hints that drive generated config forms (D87).
+message UiHint {
+  string label = 1;
+  string help = 2;
+  // Fields with the same group render together under a collapsible heading.
+  string group = 3;
+  int32 order = 4;
+  bool hidden = 5;
+  Widget widget = 6;
+  // Default value in protobuf JSON encoding, applied to new messages.
+  string default_json = 7;
+  // Target kind of an EntityRef field; the reference picker lists entities of
+  // this kind (D107).
+  EntityKind ref_kind = 8;
+}
+
+// Core options occupy 50000-50999 on every options message. A field carrying
+// a number in this range that the UI build does not know comes from a newer
+// core and is rendered read-only (docs/UI.md Section 5).
+extend google.protobuf.FieldOptions {
+  Quantity quantity = 50001;
+  UiHint ui = 50002;
+}
+
+extend google.protobuf.EnumValueOptions {
+  string label = 50001;
+}

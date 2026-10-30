@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+// Response of GET /version, checked by every client at connect (D137).
+message VersionInfo {
+  // Wire API version; the UI refuses to run when it differs from its own.
+  string api_version = 1;
+  // Identity of the server build.
+  string build_id = 2;
+  string server_version = 3;
+}

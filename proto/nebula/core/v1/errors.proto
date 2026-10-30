@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/entity.proto";
+
+// A validation error attached to a field path, for example "grid.nr".
+message FieldViolation {
+  string path = 1;
+  string message = 2;
+}
+
+// Error body of every non-2xx REST response except 409 on drafts.
+message ApiError {
+  string code = 1;
+  string message = 2;
+  repeated FieldViolation violations = 3;
+}
+
+// Body of a 409 on a conditional draft update (D148): the server's current
+// draft, against which the client re-applies or discards its change.
+message DraftConflict {
+  string message = 1;
+  EntityDraft current = 2;
+}

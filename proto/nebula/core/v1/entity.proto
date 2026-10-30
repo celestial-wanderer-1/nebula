@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+// Entities with the draft/version model of A§4.2 (D56).
+enum EntityKind {
+  ENTITY_KIND_UNSPECIFIED = 0;
+  ENTITY_KIND_GEOMETRY = 1;
+  ENTITY_KIND_COMPONENT = 2;
+  ENTITY_KIND_REGION = 3;
+  ENTITY_KIND_SCENARIO = 4;
+  ENTITY_KIND_CONDUCTOR_NETWORK = 5;
+  ENTITY_KIND_WORKFLOW = 6;
+}
+
+// A reference to another entity in one of the states of A§4.2 (D107).
+message EntityRef {
+  message Pinned {
+    string version_hash = 1;
+  }
+  message Latest {}
+  message Draft {}
+
+  EntityKind kind = 1;
+  string id = 2;
+  oneof state {
+    Pinned pinned = 3;
+    Latest latest = 4;
+    Draft draft = 5;
+  }
+}
+
+// The mutable draft of an entity. content holds the kind-specific message,
+// for example a component shape from core or from a plugin.
+message EntityDraft {
+  EntityKind kind = 1;
+  string id = 2;
+  string name = 3;
+  // Incremented on every accepted update; updates are conditional on it (D148).
+  uint32 revision = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  google.protobuf.Any content = 6;
+}
+
+// Body of a conditional draft update. The base revision travels in If-Match.
+message UpdateDraftRequest {
+  string name = 1;
+  google.protobuf.Any content = 2;
+}
+
+// How a version was minted (A§4.2, D110).
+enum MintedBy {
+  MINTED_BY_UNSPECIFIED = 0;
+  MINTED_BY_RUN_SUBMISSION = 1;
+  MINTED_BY_PROMOTION = 2;
+  MINTED_BY_SOLVED_SCENARIO = 3;
+}
+
+message VersionMeta {
+  string hash = 1;
+  google.protobuf.Timestamp minted_at = 2;
+  MintedBy minted_by = 3;
+  // Run or Study iterate that minted the version.
+  string source_id = 4;
+}
+
+message ListVersionsResponse {
+  // Newest first.
+  repeated VersionMeta versions = 1;
+  // Hash of the head pointer; empty when the entity was never versioned.
+  string head_hash = 2;
+}
+
+// One row of an entity listing.
+message EntitySummary {
+  EntityKind kind = 1;
+  string id = 2;
+  string name = 3;
+  uint32 revision = 4;
+  string head_hash = 5;
+  // Fully qualified name of the content message.
+  string content_type = 6;
+}
+
+message ListEntitiesResponse {
+  repeated EntitySummary entities = 1;
+}
+
+enum ChangeType {
+  CHANGE_TYPE_UNSPECIFIED = 0;
+  CHANGE_TYPE_CREATED = 1;
+  CHANGE_TYPE_DRAFT_UPDATED = 2;
+  CHANGE_TYPE_VERSION_MINTED = 3;
+  CHANGE_TYPE_DELETED = 4;
+}
+
+// Event on /ws/projects/{p}/entities, sent for changes made by any client (D148).
+message EntityChange {
+  string project_id = 1;
+  EntityKind kind = 2;
+  string id = 3;
+  ChangeType change = 4;
+  uint32 revision = 5;
+  // Set for CHANGE_TYPE_VERSION_MINTED.
+  string version_hash = 6;
+}
+
+// A reference to a committed HDF5 dataset (A§5.2). The hash verifies content;
+// it never locates the file.
+message DatasetRef {
+  // Run ID or artifact key.
+  string owner = 1;
+  // Relative to the project directory.
+  string file_path = 2;
+  string dataset_path = 3;
+  string content_hash = 4;
+}

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// One GPU in a telemetry sample from amd-smi or NVML (D44).
+message GpuTelemetry {
+  uint32 gpu_index = 1;
+  string model = 2;
+  // Fraction in [0, 1].
+  double utilization = 3;
+  uint64 memory_used_bytes = 4;
+  uint64 memory_total_bytes = 5;
+  // Run using this GPU; empty when idle.
+  string run_id = 6;
+}
+
+// Event on /ws/telemetry. Best-effort; frames may be dropped (D106).
+message TelemetryEvent {
+  google.protobuf.Timestamp time = 1;
+  repeated GpuTelemetry gpus = 2;
+}
