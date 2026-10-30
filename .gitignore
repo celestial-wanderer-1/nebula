@@ -1,0 +1,9 @@
+node_modules/
+web/dist/
+web/src/gen/
+web/src/mocks/fixtures/*.binpb
+web/test-results/
+web/playwright-report/
+web/coverage/
+*.tsbuildinfo
+web/src/mocks/fixtures/acme-demo.ts

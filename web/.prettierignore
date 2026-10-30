@@ -1,0 +1,10 @@
+node_modules/
+dist/
+src/gen/
+src/mocks/fixtures/*.binpb
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+src/mocks/fixtures/acme-demo.ts
+public/mockServiceWorker.js
