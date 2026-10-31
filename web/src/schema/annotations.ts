@@ -4,12 +4,16 @@ import {
   hasExtension,
   type DescEnumValue,
   type DescField,
+  type DescMessage,
 } from "@bufbuild/protobuf";
 import {
+  component,
+  ComponentTraitsSchema,
   label,
   quantity,
   ui,
   UiHintSchema,
+  type ComponentTraits,
   type Quantity,
   type UiHint,
 } from "../gen/nebula/core/v1/options_pb";
@@ -20,6 +24,7 @@ const CORE_OPTION_MAX = 50999;
 const KNOWN_FIELD_OPTIONS = new Set([quantity.number, ui.number]);
 
 const emptyHint = create(UiHintSchema);
+const emptyTraits = create(ComponentTraitsSchema);
 
 /** Unit tag and bounds of a numeric field (A§5.8), when annotated. */
 export function quantityOf(field: DescField): Quantity | undefined {
@@ -35,6 +40,18 @@ export function uiHintOf(field: DescField): UiHint {
   return options && hasExtension(options, ui)
     ? getExtension(options, ui)
     : emptyHint;
+}
+
+/**
+ * Traits of a component shape message: whether it carries current and
+ * whether it is a filament. Circuits and the closure check read them (D114,
+ * D145). Empty traits when not annotated.
+ */
+export function componentTraitsOf(desc: DescMessage): ComponentTraits {
+  const options = desc.proto.options;
+  return options && hasExtension(options, component)
+    ? getExtension(options, component)
+    : emptyTraits;
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   file_nebula_core_v1_entity,
 } from "../gen/nebula/core/v1/entity_pb";
 import {
+  component,
   file_nebula_core_v1_options,
   quantity,
   ui,
@@ -79,5 +80,15 @@ describe("generated plugin descriptor fixture", () => {
     const options = config.field.futureField?.proto.options;
     assert(options);
     expect(options.$unknown?.some((field) => field.no === 50999)).toBe(true);
+  });
+
+  it("keeps the component traits message option of plugin shapes (D114)", () => {
+    const options = registry.getMessage("acme.demo.v1.SaddleCoil")?.proto
+      .options;
+    assert(options);
+    expect(getExtension(options, component)).toMatchObject({
+      currentCarrying: true,
+      filament: false,
+    });
   });
 });

@@ -48,6 +48,24 @@ export function numericKind(
 export type Parsed =
   { ok: true; value: NumericValue } | { ok: false; error: string };
 
+/**
+ * The range of an integer kind on the wire. The binary writer throws on any
+ * other value, and every content edit is packed into an Any at once.
+ */
+function integerRange(kind: NumericKind): readonly [bigint, bigint] {
+  const bits = kind.long ? 64n : 32n;
+  return kind.unsigned
+    ? [0n, (1n << bits) - 1n]
+    : [-(1n << (bits - 1n)), (1n << (bits - 1n)) - 1n];
+}
+
+function outOfRange(value: bigint, kind: NumericKind): string | undefined {
+  const [min, max] = integerRange(kind);
+  if (value < min) return `Must be at least ${min}`;
+  if (value > max) return `Must be at most ${max}`;
+  return undefined;
+}
+
 /** Parses user text into the field's JavaScript representation. */
 export function parseNumber(text: string, kind: NumericKind): Parsed {
   const trimmed = text.trim();
@@ -62,6 +80,8 @@ export function parseNumber(text: string, kind: NumericKind): Parsed {
     if (kind.unsigned && value < 0n) {
       return { ok: false, error: "Must not be negative" };
     }
+    const range = outOfRange(value, kind);
+    if (range) return { ok: false, error: range };
     return {
       ok: true,
       value: kind.long === "string" ? value.toString() : value,
@@ -74,6 +94,10 @@ export function parseNumber(text: string, kind: NumericKind): Parsed {
   }
   if (kind.unsigned && value < 0) {
     return { ok: false, error: "Must not be negative" };
+  }
+  if (kind.integer) {
+    const range = outOfRange(BigInt(value), kind);
+    if (range) return { ok: false, error: range };
   }
   return { ok: true, value };
 }

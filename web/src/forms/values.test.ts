@@ -27,6 +27,29 @@ describe("parseNumber", () => {
     });
   });
 
+  it("rejects integers outside the field's wire range", () => {
+    const int32 = numericKind(ScalarType.INT32);
+    expect(parseNumber("2147483647", int32)).toEqual({
+      ok: true,
+      value: 2147483647,
+    });
+    expect(parseNumber("3000000000", int32)).toEqual({
+      ok: false,
+      error: "Must be at most 2147483647",
+    });
+    expect(parseNumber("-2147483649", int32)).toEqual({
+      ok: false,
+      error: "Must be at least -2147483648",
+    });
+    expect(parseNumber("4294967296", numericKind(ScalarType.UINT32))).toEqual({
+      ok: false,
+      error: "Must be at most 4294967295",
+    });
+    expect(
+      parseNumber("9223372036854775808", numericKind(ScalarType.INT64)),
+    ).toEqual({ ok: false, error: "Must be at most 9223372036854775807" });
+  });
+
   it("parses 64-bit integers as bigint without losing precision", () => {
     expect(
       parseNumber("9007199254740993", numericKind(ScalarType.INT64)),

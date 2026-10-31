@@ -7,6 +7,7 @@ import {
   EntityChangeSchema,
   EntityDraftSchema,
   EntityKind,
+  ListEntitiesResponseSchema,
 } from "../gen/nebula/core/v1/entity_pb";
 import { applyEntityChange } from "./channels";
 
@@ -15,14 +16,19 @@ const draftKey = queryKeys.draft("p", kind, "g");
 const versionsKey = queryKeys.versions("p", kind, "g");
 const listKey = queryKeys.entities("p", kind);
 
-function setup(heldRevision: number) {
+function setup(heldRevision: number, listedRevision = heldRevision) {
   const client = new QueryClient();
   client.setQueryData(
     draftKey,
     create(EntityDraftSchema, { revision: heldRevision }),
   );
   client.setQueryData(versionsKey, {});
-  client.setQueryData(listKey, {});
+  client.setQueryData(
+    listKey,
+    create(ListEntitiesResponseSchema, {
+      entities: [{ kind, id: "g", revision: listedRevision }],
+    }),
+  );
   const stale = (key: readonly unknown[]) =>
     client.getQueryState(key)?.isInvalidated ?? false;
   const change = (type: ChangeType, revision: number) =>
@@ -44,8 +50,17 @@ describe("applyEntityChange (D148)", () => {
     const { stale, change } = setup(5);
     change(ChangeType.DRAFT_UPDATED, 5); // our own save, echoed back
     expect(stale(draftKey)).toBe(false);
+    expect(stale(listKey)).toBe(false);
     change(ChangeType.DRAFT_UPDATED, 6); // another client's save
     expect(stale(draftKey)).toBe(true);
+    expect(stale(listKey)).toBe(true);
+  });
+
+  it("refetches a list that lags the held draft", () => {
+    // A 409 brought revision 6 into the draft cache before its event.
+    const { stale, change } = setup(6, 5);
+    change(ChangeType.DRAFT_UPDATED, 6);
+    expect(stale(draftKey)).toBe(false);
     expect(stale(listKey)).toBe(true);
   });
 

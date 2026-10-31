@@ -9,7 +9,22 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Software WebGL for the geometry viewport in headless runs.
+        launchOptions: {
+          args: [
+            "--use-angle=swiftshader",
+            "--enable-unsafe-swiftshader",
+            "--ignore-gpu-blocklist",
+          ],
+        },
+      },
+    },
+  ],
   webServer: {
     command:
       "pnpm run build:mock && pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort",

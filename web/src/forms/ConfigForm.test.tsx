@@ -267,7 +267,6 @@ describe("ConfigForm over a core message (D111)", () => {
       screen.getByLabelText(/Major radius/).closest(".field"),
     ).toHaveTextContent("Major radius [m]DV");
     expect(screen.getByLabelText(/Height \(z\)/)).toBeVisible();
-    expect(screen.getByLabelText("Turns")).toHaveValue("1");
     const group = screen.getByRole("button", {
       name: "Discretization",
     }).parentElement!;

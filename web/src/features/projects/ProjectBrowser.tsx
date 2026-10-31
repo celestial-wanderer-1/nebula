@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { errorMessage } from "../../api/errors";
 import { exportProject, useProjects } from "../../api/projects";
 import { ProvenanceTags } from "../../entities/ProvenanceTags";
 import type { Project } from "../../gen/nebula/core/v1/project_pb";
 import { ProvenanceTag } from "../../gen/nebula/core/v1/run_pb";
 import { CreateProjectDialog } from "./CreateProjectDialog";
-import { conceptName, formatTime } from "./format";
+import { formatTime } from "../../entities/format";
+import { conceptName } from "./format";
 import { ImportDialog } from "./ImportDialog";
 import { SaveTemplateDialog } from "./SaveTemplateDialog";
 
@@ -21,7 +23,7 @@ export function ProjectBrowser() {
     setExportError(undefined);
     exportProject(project).catch((error: unknown) =>
       setExportError(
-        `Export of “${project.name}” failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Export of “${project.name}” failed: ${errorMessage(error)}`,
       ),
     );
   };

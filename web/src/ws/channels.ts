@@ -10,6 +10,7 @@ import {
   EntityChangeSchema,
   type EntityChange,
   type EntityDraft,
+  type ListEntitiesResponse,
 } from "../gen/nebula/core/v1/entity_pb";
 import {
   QueueEventSchema,
@@ -27,9 +28,11 @@ export const QUEUE_CHANNEL = "/ws/queue";
 export const TELEMETRY_CHANNEL = "/ws/telemetry";
 
 /**
- * Applies an entity-change event to the query cache. A draft is refetched
- * only when the event's revision is newer than the cached one, so a client's
- * own saves, already in the cache, cause no refetch (D148).
+ * Applies an entity-change event to the query cache. A draft or list is
+ * refetched only when the event's revision is newer than the cached one, so
+ * a client's own saves, already in the cache, cause no refetch (D148). Each
+ * is checked on its own: a draft can arrive first (a 409's current draft)
+ * while the list still lists an older revision.
  */
 export function applyEntityChange(
   queryClient: QueryClient,
@@ -43,6 +46,11 @@ export function applyEntityChange(
       const held = queryClient.getQueryData<EntityDraft>(draftKey);
       if (!held || change.revision > held.revision) {
         void queryClient.invalidateQueries({ queryKey: draftKey });
+      }
+      const listed = queryClient
+        .getQueryData<ListEntitiesResponse>(listKey)
+        ?.entities.find((entity) => entity.id === id);
+      if (!listed || change.revision > listed.revision) {
         void queryClient.invalidateQueries({ queryKey: listKey });
       }
       break;

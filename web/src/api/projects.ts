@@ -16,6 +16,7 @@ import {
   type SaveTemplateRequest,
 } from "../gen/nebula/core/v1/project_pb";
 import { apiBlob, apiJson, jsonBody } from "./client";
+import { saveDownload } from "./download";
 import { queryKeys } from "./queryKeys";
 
 const projectPath = (projectId: string) =>
@@ -93,19 +94,8 @@ export function useSaveTemplate() {
   });
 }
 
-/** Downloads a project snapshot (D100) through an object URL. */
+/** Downloads a project snapshot (D100). */
 export async function exportProject(project: Project): Promise<void> {
-  const { blob, filename } = await apiBlob(`${projectPath(project.id)}/export`);
-  const url = URL.createObjectURL(blob);
-  try {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename ?? `${project.name || project.id}.nebula`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-  } finally {
-    // Revoke after the click has been dispatched.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
+  const file = await apiBlob(`${projectPath(project.id)}/export`);
+  saveDownload(file, `${project.name || project.id}.nebula`);
 }

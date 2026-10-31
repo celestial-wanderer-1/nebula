@@ -4,7 +4,8 @@ import { useProject } from "../../api/projects";
 import { PROJECT_AREAS } from "../../app/areas";
 import { ProvenanceTags } from "../../entities/ProvenanceTags";
 import { ProvenanceTag } from "../../gen/nebula/core/v1/run_pb";
-import { conceptName, formatTime } from "./format";
+import { formatTime } from "../../entities/format";
+import { conceptName } from "./format";
 
 export function ProjectOverview() {
   const { projectId = "" } = useParams();

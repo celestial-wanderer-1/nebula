@@ -1,28 +1,10 @@
 import { fileURLToPath } from "node:url";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { createProject, TOKEN, trackErrors } from "./helpers";
 
-// The launch URL `nebula serve` would print; the mock accepts this token.
-const TOKEN = "#token=mock-token";
 const foreignExport = fileURLToPath(
   new URL("./fixtures/foreign-build.nebula", import.meta.url),
 );
-
-function trackErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  return errors;
-}
-
-async function createProject(page: Page, template: string, name: string) {
-  await page.getByRole("button", { name: "New project" }).click();
-  const dialog = page.getByRole("dialog", { name: "New project" });
-  await dialog.getByLabel("Template").selectOption({ label: template });
-  await dialog.getByLabel("Name").fill(name);
-  await dialog.getByRole("button", { name: "Create project" }).click();
-  await expect(
-    page.getByRole("main").getByRole("heading", { name, level: 1 }),
-  ).toBeVisible();
-}
 
 test("asks for the launch URL when opened without a token", async ({
   page,

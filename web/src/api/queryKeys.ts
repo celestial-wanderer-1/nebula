@@ -1,4 +1,4 @@
-import type { EntityKind } from "../gen/nebula/core/v1/entity_pb";
+import { EntityKind } from "../gen/nebula/core/v1/entity_pb";
 
 // Stable query keys of the form [projectId | "global", kind, id, ...]
 // (docs/UI.md Section 4.2). Invalidating a prefix covers everything below it.
@@ -23,4 +23,24 @@ export const queryKeys = {
     [projectId, kind, id, "draft"] as const,
   versions: (projectId: string, kind: EntityKind, id: string) =>
     [projectId, kind, id, "versions"] as const,
+  // The fingerprint names the inputs the mesh was built from, so each new
+  // revision is a new query (D148).
+  tessellation: (projectId: string, geometryId: string, fingerprint: string) =>
+    [
+      projectId,
+      EntityKind.GEOMETRY,
+      geometryId,
+      "tessellation",
+      fingerprint,
+    ] as const,
+  // Materials are project resources, not entities (D127).
+  materials: (projectId: string) => [projectId, "materials", "list"] as const,
+  material: (projectId: string, id: string) =>
+    [projectId, "materials", id] as const,
+  libraryComponents: () => [GLOBAL, "library", "components"] as const,
+  libraryComponent: (id: string) =>
+    [GLOBAL, "library", "components", id] as const,
+  libraryMaterials: () => [GLOBAL, "library", "materials"] as const,
+  libraryMaterial: (id: string) =>
+    [GLOBAL, "library", "materials", id] as const,
 };

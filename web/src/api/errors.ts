@@ -8,6 +8,11 @@ import {
 } from "../gen/nebula/core/v1/errors_pb";
 import { getTypeRegistry } from "./registry";
 
+/** The message of anything thrown, for error text in the UI. */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** A non-2xx response. Subclasses type the cases the UI handles. */
 export class ApiRequestError extends Error {
   constructor(

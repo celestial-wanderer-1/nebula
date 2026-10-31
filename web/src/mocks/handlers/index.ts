@@ -4,12 +4,27 @@ import {
   DraftConflictSchema,
 } from "../../gen/nebula/core/v1/errors_pb";
 import {
+  CreateEntityRequestSchema,
   EntityDraftSchema,
   EntityKind,
   ListEntitiesResponseSchema,
   ListVersionsResponseSchema,
   UpdateDraftRequestSchema,
 } from "../../gen/nebula/core/v1/entity_pb";
+import { GeometryTessellationSchema } from "../../gen/nebula/core/v1/geometry_pb";
+import {
+  AddToLibraryRequestSchema,
+  ImportFromLibraryRequestSchema,
+  LibraryComponentSchema,
+  LibraryMaterialSchema,
+  ListLibraryComponentsResponseSchema,
+  ListLibraryMaterialsResponseSchema,
+} from "../../gen/nebula/core/v1/library_pb";
+import {
+  ListMaterialsResponseSchema,
+  MaterialRequestSchema,
+  MaterialSchema,
+} from "../../gen/nebula/core/v1/material_pb";
 import { ListPluginsResponseSchema } from "../../gen/nebula/core/v1/plugin_pb";
 import {
   CreateProjectRequestSchema,
@@ -22,6 +37,7 @@ import {
 } from "../../gen/nebula/core/v1/project_pb";
 import { VersionInfoSchema } from "../../gen/nebula/core/v1/version_pb";
 import { ENTITY_SEGMENTS } from "../../api/entities";
+import { downloadName, type StoreResult } from "../store";
 import { store } from "../state";
 import { MOCK_BUILD_ID } from "../token";
 import { apiError, notFound, proto, readProto, unauthorized } from "./util";
@@ -35,6 +51,30 @@ const kindBySegment = new Map(
 function entityKind(segment: unknown): EntityKind | undefined {
   return typeof segment === "string" ? kindBySegment.get(segment) : undefined;
 }
+
+/** Maps a store result to its response; failures become ApiError bodies. */
+function reply<T>(
+  result: StoreResult<T>,
+  respond: (value: T) => Response,
+): Response {
+  return result.ok
+    ? respond(result.value)
+    : apiError(result.status, result.code, result.message);
+}
+
+const created = { status: 201 };
+
+const nameRequired = () =>
+  proto(
+    ApiErrorSchema,
+    {
+      code: "invalid",
+      message: "Validation failed",
+      violations: [{ path: "name", message: "A name is required" }],
+    },
+    { status: 422 },
+  );
+const noContent = () => new HttpResponse(null, { status: 204 });
 
 // Paths the server owns; anything else (the bundle, assets) passes through.
 const API_PATH =
@@ -69,17 +109,7 @@ export const restHandlers = [
 
   http.post("/projects", async ({ request }) => {
     const body = await readProto(CreateProjectRequestSchema, request);
-    if (!body.name.trim()) {
-      return proto(
-        ApiErrorSchema,
-        {
-          code: "invalid",
-          message: "Validation failed",
-          violations: [{ path: "name", message: "A name is required" }],
-        },
-        { status: 422 },
-      );
-    }
+    if (!body.name.trim()) return nameRequired();
     const project = store.createProject(
       body.name.trim(),
       body.description,
@@ -106,7 +136,7 @@ export const restHandlers = [
     const id = String(params.projectId);
     const snapshot = store.exportProject(id);
     if (snapshot === undefined) return notFound("Project");
-    const name = store.project(id)?.name.replace(/[^\w.-]+/g, "-") ?? id;
+    const name = downloadName(store.project(id)?.name ?? id);
     return new HttpResponse(snapshot, {
       headers: {
         "Content-Type": "application/octet-stream",
@@ -127,6 +157,168 @@ export const restHandlers = [
       : notFound("Project");
   }),
 
+  // User-global library (D88).
+
+  http.get("/library/components", () =>
+    proto(ListLibraryComponentsResponseSchema, {
+      components: store.library.components,
+    }),
+  ),
+
+  http.get("/library/components/:entryId", ({ params }) => {
+    const entry = store.library.components.find((c) => c.id === params.entryId);
+    return entry
+      ? proto(LibraryComponentSchema, entry)
+      : notFound("Library component");
+  }),
+
+  http.post("/library/components", async ({ request }) => {
+    const body = await readProto(AddToLibraryRequestSchema, request);
+    return reply(
+      store.addComponentToLibrary(
+        body.projectId,
+        body.itemId,
+        body.description,
+      ),
+      (entry) => proto(LibraryComponentSchema, entry, created),
+    );
+  }),
+
+  http.get("/library/materials", () =>
+    proto(ListLibraryMaterialsResponseSchema, {
+      materials: store.library.materials,
+    }),
+  ),
+
+  http.get("/library/materials/:entryId", ({ params }) => {
+    const entry = store.library.materials.find((m) => m.id === params.entryId);
+    return entry
+      ? proto(LibraryMaterialSchema, entry)
+      : notFound("Library material");
+  }),
+
+  http.post("/library/materials", async ({ request }) => {
+    const body = await readProto(AddToLibraryRequestSchema, request);
+    return reply(
+      store.addMaterialToLibrary(body.projectId, body.itemId, body.description),
+      (entry) => proto(LibraryMaterialSchema, entry, created),
+    );
+  }),
+
+  // Project materials and imports: before the generic entity handlers, whose
+  // :segment and :id would otherwise match them.
+
+  http.get("/projects/:projectId/materials", ({ params }) => {
+    const projectId = String(params.projectId);
+    if (!store.project(projectId)) return notFound("Project");
+    return proto(ListMaterialsResponseSchema, {
+      materials: store.materialList(projectId),
+    });
+  }),
+
+  http.post(
+    "/projects/:projectId/materials/import",
+    async ({ params, request }) => {
+      const body = await readProto(ImportFromLibraryRequestSchema, request);
+      return reply(
+        store.importMaterial(String(params.projectId), body.entryId),
+        (material) => proto(MaterialSchema, material, created),
+      );
+    },
+  ),
+
+  http.post("/projects/:projectId/materials", async ({ params, request }) => {
+    const body = await readProto(MaterialRequestSchema, request);
+    if (!body.name.trim()) return nameRequired();
+    return reply(
+      store.createMaterial(String(params.projectId), {
+        ...body,
+        name: body.name.trim(),
+      }),
+      (material) => proto(MaterialSchema, material, created),
+    );
+  }),
+
+  http.get("/projects/:projectId/materials/:materialId", ({ params }) => {
+    const material = store.material(
+      String(params.projectId),
+      String(params.materialId),
+    );
+    return material ? proto(MaterialSchema, material) : notFound("Material");
+  }),
+
+  http.put(
+    "/projects/:projectId/materials/:materialId",
+    async ({ params, request }) => {
+      const body = await readProto(MaterialRequestSchema, request);
+      if (!body.name.trim()) return nameRequired();
+      return reply(
+        store.updateMaterial(
+          String(params.projectId),
+          String(params.materialId),
+          { ...body, name: body.name.trim() },
+        ),
+        (material) => proto(MaterialSchema, material),
+      );
+    },
+  ),
+
+  http.delete("/projects/:projectId/materials/:materialId", ({ params }) =>
+    reply(
+      store.deleteMaterial(String(params.projectId), String(params.materialId)),
+      noContent,
+    ),
+  ),
+
+  http.post(
+    "/projects/:projectId/components/import",
+    async ({ params, request }) => {
+      const body = await readProto(ImportFromLibraryRequestSchema, request);
+      return reply(
+        store.importComponent(String(params.projectId), body.entryId),
+        (record) => proto(EntityDraftSchema, record.draft, created),
+      );
+    },
+  ),
+
+  // Geometry worker outputs (A§3.3, D27).
+
+  http.get(
+    "/projects/:projectId/geometries/:geometryId/tessellation",
+    ({ params, request }) => {
+      const tessellation = store.tessellation(
+        String(params.projectId),
+        String(params.geometryId),
+        new URL(request.url).searchParams.get("component") ?? undefined,
+      );
+      return tessellation
+        ? proto(GeometryTessellationSchema, tessellation)
+        : notFound("Geometry");
+    },
+  ),
+
+  http.get(
+    "/projects/:projectId/geometries/:geometryId/step",
+    ({ params, request }) => {
+      const version =
+        new URL(request.url).searchParams.get("version") ?? undefined;
+      const step = store.step(
+        String(params.projectId),
+        String(params.geometryId),
+        version,
+      );
+      if (!step) return notFound(version ? "Version" : "Geometry");
+      return new HttpResponse(step.body, {
+        headers: {
+          "Content-Type": "application/step",
+          "Content-Disposition": `attachment; filename="${step.filename}"`,
+        },
+      });
+    },
+  ),
+
+  // Generic entity collections (A§13.2).
+
   http.get("/projects/:projectId/:segment", ({ params }) => {
     const kind = entityKind(params.segment);
     const projectId = String(params.projectId);
@@ -138,6 +330,22 @@ export const restHandlers = [
         .entityRecords(projectId, kind)
         .map((record) => store.summary(record)),
     });
+  }),
+
+  http.post("/projects/:projectId/:segment", async ({ params, request }) => {
+    const kind = entityKind(params.segment);
+    if (kind === undefined) return notFound("Collection");
+    const body = await readProto(CreateEntityRequestSchema, request);
+    if (!body.name.trim()) return nameRequired();
+    return reply(
+      store.createEntity(
+        String(params.projectId),
+        kind,
+        body.name.trim(),
+        body.content,
+      ),
+      (record) => proto(EntityDraftSchema, record.draft, created),
+    );
   }),
 
   http.get("/projects/:projectId/:segment/:id", ({ params }) => {
@@ -176,6 +384,15 @@ export const restHandlers = [
           );
     },
   ),
+
+  http.delete("/projects/:projectId/:segment/:id", ({ params }) => {
+    const kind = entityKind(params.segment);
+    if (kind === undefined) return notFound("Entity");
+    return reply(
+      store.deleteEntity(String(params.projectId), kind, String(params.id)),
+      noContent,
+    );
+  }),
 
   http.get("/projects/:projectId/:segment/:id/versions", ({ params }) => {
     const kind = entityKind(params.segment);
