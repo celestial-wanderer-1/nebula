@@ -37,8 +37,9 @@ describe("WsManager", () => {
     const off = instance.subscribe("/ws/queue", QueueEventSchema, (event) =>
       received.push(event),
     );
-    await vi.waitFor(() => expect(received).toHaveLength(1));
-    expect(received[0]?.event.case).toBe("summary");
+    // The queue channel opens with the counts, then the queue itself.
+    await vi.waitFor(() => expect(received).toHaveLength(2));
+    expect(received.map((e) => e.event.case)).toEqual(["summary", "entries"]);
     off();
   });
 

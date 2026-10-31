@@ -24,3 +24,38 @@ export async function createProject(
     page.getByRole("main").getByRole("heading", { name, level: 1 }),
   ).toBeVisible();
 }
+
+// RunState values; e2e tests do not import the generated code.
+export const RUN_STATE = {
+  QUEUED: 1,
+  PREPARING: 2,
+  RUNNING: 3,
+  PAUSED: 4,
+  COMPLETED: 5,
+  FAILED: 6,
+  CANCELLED: 7,
+} as const;
+
+/** Calls a scripted situation of the mock backend (src/mocks/scenarios.ts). */
+export async function mock<A extends unknown[]>(
+  page: Page,
+  name: string,
+  ...args: A
+): Promise<void> {
+  // The mock backend starts asynchronously after the page loads.
+  await page.waitForFunction(() => window.__nebulaMock !== undefined);
+  await page.evaluate(
+    ([scenario, rest]) => {
+      const scenarios = window.__nebulaMock as unknown as Record<
+        string,
+        (...a: unknown[]) => void
+      >;
+      scenarios[scenario as string]!(...(rest as unknown[]));
+    },
+    [name, args] as const,
+  );
+}
+
+/** The ID of the Run whose page is open. */
+export const runIdOf = (page: Page) =>
+  page.url().split("/").pop()!.split("#")[0]!;

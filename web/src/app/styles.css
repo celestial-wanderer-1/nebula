@@ -1226,3 +1226,152 @@ button.danger {
   flex-direction: column;
   gap: 0.35rem;
 }
+
+/* Runs (features/runs, entities/Run*, 6.6) */
+
+.dialog-wide {
+  width: min(40rem, 92vw);
+}
+
+.submit-summary {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.submit-summary h3 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9rem;
+}
+
+.submit-summary p,
+.submit-summary ul {
+  margin: 0.25rem 0;
+}
+
+.run-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.run-page .page-header {
+  margin-bottom: 0;
+}
+
+.run-header,
+.run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.run-state {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.badge.state-running,
+.badge.state-preparing {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.badge.state-queued,
+.badge.state-paused {
+  border-color: var(--info);
+  color: var(--info);
+}
+
+.badge.state-completed {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+}
+
+.badge.state-failed {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.badge.state-cancelled,
+.badge.state-discarded {
+  color: var(--muted);
+}
+
+.run-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.timeline,
+.gpu-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.provenance ul {
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.log-view {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.log-view h2 {
+  margin: 0 0 0.5rem;
+}
+
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.log-filters input {
+  width: 8rem;
+}
+
+.log-lines {
+  max-height: 20rem;
+  overflow: auto;
+  margin: 0.5rem 0 0;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  list-style: none;
+}
+
+.log-lines li[data-level="warning"] .log-level {
+  color: var(--warn);
+}
+
+.log-lines li[data-level="error"] {
+  color: var(--error);
+}
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--info);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.banner p {
+  margin: 0;
+}

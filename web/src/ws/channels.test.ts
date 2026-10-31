@@ -9,7 +9,19 @@ import {
   EntityKind,
   ListEntitiesResponseSchema,
 } from "../gen/nebula/core/v1/entity_pb";
-import { applyEntityChange } from "./channels";
+import {
+  ListRunOutputsResponseSchema,
+  type ListRunOutputsResponse,
+} from "../gen/nebula/core/v1/output_pb";
+import { QueueEventSchema } from "../gen/nebula/core/v1/queue_pb";
+import {
+  RunEventSchema,
+  RunSchema,
+  RunState,
+  StepState,
+  type Run,
+} from "../gen/nebula/core/v1/run_pb";
+import { applyEntityChange, applyQueueEvent, applyRunEvent } from "./channels";
 
 const kind = EntityKind.GEOMETRY;
 const draftKey = queryKeys.draft("p", kind, "g");
@@ -76,5 +88,72 @@ describe("applyEntityChange (D148)", () => {
     change(ChangeType.DELETED, 5);
     expect(client.getQueryData(draftKey)).toBeUndefined();
     expect(stale(listKey)).toBe(true);
+  });
+});
+
+describe("run and queue events (D106)", () => {
+  it("overwrites a Run with its snapshot and patches steps and outputs", () => {
+    const client = new QueryClient();
+    const key = queryKeys.run("p", "r-1");
+    client.setQueryData(
+      key,
+      create(RunSchema, {
+        id: "r-1",
+        state: RunState.QUEUED,
+        steps: [{ nodeId: "a", state: StepState.PENDING }],
+      }),
+    );
+    client.setQueryData(
+      queryKeys.runOutputs("p", "r-1"),
+      create(ListRunOutputsResponseSchema, {}),
+    );
+    const event = (init: Parameters<typeof create<typeof RunEventSchema>>[1]) =>
+      applyRunEvent(
+        client,
+        "p",
+        create(RunEventSchema, { runId: "r-1", ...init }),
+      );
+    event({
+      event: { case: "step", value: { nodeId: "a", state: StepState.RUNNING } },
+    });
+    expect(client.getQueryData<Run>(key)?.steps[0]?.state).toBe(
+      StepState.RUNNING,
+    );
+    event({ event: { case: "output", value: { nodeId: "a", name: "x" } } });
+    event({ event: { case: "output", value: { nodeId: "a", name: "x" } } });
+    expect(
+      client.getQueryData<ListRunOutputsResponse>(
+        queryKeys.runOutputs("p", "r-1"),
+      )?.outputs,
+    ).toHaveLength(1);
+    event({
+      event: { case: "run", value: { id: "r-1", state: RunState.RUNNING } },
+    });
+    expect(client.getQueryData<Run>(key)).toMatchObject({
+      state: RunState.RUNNING,
+      steps: [],
+    });
+  });
+
+  it("refetches a Run whose state changed and its project's list", () => {
+    const client = new QueryClient();
+    client.setQueryData(
+      queryKeys.run("p", "r-1"),
+      create(RunSchema, { state: RunState.QUEUED }),
+    );
+    client.setQueryData(queryKeys.runs("p"), {});
+    applyQueueEvent(
+      client,
+      create(QueueEventSchema, {
+        event: {
+          case: "runState",
+          value: { runId: "r-1", projectId: "p", state: RunState.RUNNING },
+        },
+      }),
+    );
+    expect(client.getQueryState(queryKeys.run("p", "r-1"))?.isInvalidated).toBe(
+      true,
+    );
+    expect(client.getQueryState(queryKeys.runs("p"))?.isInvalidated).toBe(true);
   });
 });

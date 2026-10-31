@@ -29,6 +29,7 @@ import { downloadName } from "../store";
 import { store } from "../state";
 import { MOCK_BUILD_ID } from "../token";
 import { entityHandlers } from "./entities";
+import { runHandlers } from "./runs";
 import { setupHandlers } from "./setup";
 import {
   apiError,
@@ -287,6 +288,7 @@ export const restHandlers = [
   ),
 
   ...setupHandlers,
+  ...runHandlers,
 
   // Generic entity collections last: their :segment and :id match anything.
   ...entityHandlers,

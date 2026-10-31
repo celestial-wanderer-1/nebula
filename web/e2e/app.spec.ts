@@ -87,6 +87,22 @@ test("marks runs of an import from another build as not reproducible", async ({
 
   const row = page.getByRole("row").filter({ hasText: "Mirror from lab B" });
   await expect(row.getByText("viewable, not reproducible here")).toBeVisible();
+
+  // Reproducibility is judged per Run (D149): each imported Run says so.
+  await page.getByRole("link", { name: "Mirror from lab B" }).click();
+  await page
+    .getByRole("navigation", { name: "Project" })
+    .getByRole("link", { name: "Runs and queue" })
+    .click();
+  const runs = page.getByRole("table", { name: "Runs" });
+  for (const name of ["Lab B field map", "Lab B field lines"]) {
+    await expect(
+      runs
+        .getByRole("row")
+        .filter({ hasText: name })
+        .getByText("viewable, not reproducible here"),
+    ).toBeVisible();
+  }
 });
 
 test("opens direct project URLs, scrubs the token and needs it again after reload", async ({

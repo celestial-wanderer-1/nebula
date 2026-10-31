@@ -1,3 +1,5 @@
+import { create } from "@bufbuild/protobuf";
+import { useEffect } from "react";
 import {
   useQuery,
   useQueryClient,
@@ -12,15 +14,25 @@ import {
   type EntityDraft,
   type ListEntitiesResponse,
 } from "../gen/nebula/core/v1/entity_pb";
+import type { ListRunOutputsResponse } from "../gen/nebula/core/v1/output_pb";
 import {
+  ListQueueResponseSchema,
   QueueEventSchema,
+  type ListQueueResponse,
+  type QueueEvent,
   type QueueSummary,
 } from "../gen/nebula/core/v1/queue_pb";
+import {
+  RunEventSchema,
+  type Run,
+  type RunEvent,
+} from "../gen/nebula/core/v1/run_pb";
 import {
   TelemetryEventSchema,
   type TelemetryEvent,
 } from "../gen/nebula/core/v1/telemetry_pb";
 import { useChannel } from "./context";
+import { runProgress } from "./runProgress";
 
 export const entityChannelPath = (projectId: string) =>
   `/ws/projects/${encodeURIComponent(projectId)}/entities`;
@@ -93,18 +105,151 @@ export function useEntityChannel(projectId: string | undefined): void {
   );
 }
 
-/** Subscribes to queue counts; state events overwrite the cache (D106). */
+export const runChannelPath = (runId: string) =>
+  `/ws/runs/${encodeURIComponent(runId)}`;
+
+/**
+ * Applies a queue event (D106): counts and the queue overwrite what is
+ * cached; a Run's state change refetches that Run and its project's list.
+ */
+export function applyQueueEvent(
+  queryClient: QueryClient,
+  event: QueueEvent,
+): void {
+  switch (event.event.case) {
+    case "summary":
+      queryClient.setQueryData(queryKeys.queueSummary(), event.event.value);
+      break;
+    case "entries": {
+      const { entries } = event.event.value;
+      queryClient.setQueryData<ListQueueResponse>(queryKeys.queue(), (held) =>
+        create(ListQueueResponseSchema, { entries, summary: held?.summary }),
+      );
+      break;
+    }
+    case "runState": {
+      const { projectId, runId, studyId } = event.event.value;
+      const run = queryClient.getQueryData<Run>(
+        queryKeys.run(projectId, runId),
+      );
+      if (!run || run.state !== event.event.value.state) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.run(projectId, runId),
+          exact: true,
+        });
+      }
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.runs(projectId),
+        exact: true,
+      });
+      if (studyId) {
+        void queryClient.invalidateQueries({
+          queryKey: [projectId, "studies", studyId],
+        });
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
+ * Subscribes to the queue channel: counts, the queue and Run state changes.
+ * Mounted by the shell, so it stays open while the app is open.
+ */
 export function useQueueSummary(): QueueSummary | undefined {
   const queryClient = useQueryClient();
-  useChannel(QUEUE_CHANNEL, QueueEventSchema, (event) => {
-    if (event.event.case === "summary") {
-      queryClient.setQueryData(queryKeys.queueSummary(), event.event.value);
-    }
-  });
+  useChannel(
+    QUEUE_CHANNEL,
+    QueueEventSchema,
+    (event) => applyQueueEvent(queryClient, event),
+    () => void queryClient.invalidateQueries({ queryKey: queryKeys.queue() }),
+  );
   return useQuery<QueueSummary>({
     queryKey: queryKeys.queueSummary(),
     queryFn: skipToken,
   }).data;
+}
+
+/**
+ * Applies a Run event. A Run snapshot is state from the acknowledged log
+ * and overwrites the cached Run (D106); steps and outputs patch it; logs
+ * and residuals go to the progress buffers, which may drop.
+ */
+export function applyRunEvent(
+  queryClient: QueryClient,
+  projectId: string,
+  event: RunEvent,
+): void {
+  const { runId } = event;
+  const key = queryKeys.run(projectId, runId);
+  switch (event.event.case) {
+    case "run":
+      queryClient.setQueryData(key, event.event.value);
+      break;
+    case "step": {
+      const step = event.event.value;
+      queryClient.setQueryData<Run>(
+        key,
+        (run) =>
+          run && {
+            ...run,
+            steps: run.steps.map((s) => (s.nodeId === step.nodeId ? step : s)),
+          },
+      );
+      break;
+    }
+    case "output": {
+      const output = event.event.value;
+      queryClient.setQueryData<ListRunOutputsResponse>(
+        queryKeys.runOutputs(projectId, runId),
+        (held) =>
+          held && {
+            ...held,
+            outputs: [
+              ...held.outputs.filter(
+                (o) => !(o.nodeId === output.nodeId && o.name === output.name),
+              ),
+              output,
+            ],
+          },
+      );
+      break;
+    }
+    case "log":
+      runProgress.addLog(runId, event.event.value);
+      break;
+    case "residual":
+      runProgress.addResidual(runId, event.event.value);
+      break;
+    case "checkpoint":
+      runProgress.addCheckpoint(runId);
+      break;
+    default:
+      break;
+  }
+}
+
+/**
+ * Follows one Run while its page is open (docs/UI.md 6.6). The server sends
+ * the Run and the progress it still holds on every (re)connect, so the
+ * buffers start over each time.
+ */
+export function useRunChannel(projectId: string, runId: string): void {
+  const queryClient = useQueryClient();
+  useEffect(() => runProgress.reset(runId), [runId]);
+  useChannel(
+    runId ? runChannelPath(runId) : undefined,
+    RunEventSchema,
+    (event) => applyRunEvent(queryClient, projectId, event),
+    () => {
+      runProgress.reset(runId);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.runOutputs(projectId, runId),
+      });
+    },
+  );
 }
 
 /** Subscribes to GPU telemetry. Best-effort: frames may drop (D106). */

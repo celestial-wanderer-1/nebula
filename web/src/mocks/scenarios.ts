@@ -3,7 +3,9 @@ import { anyPack, anyUnpack, type Any } from "@bufbuild/protobuf/wkt";
 import { typeNameOf, unwrapComponent } from "../entities/content";
 import { ComponentSchema } from "../gen/nebula/core/v1/component_pb";
 import { EntityKind } from "../gen/nebula/core/v1/entity_pb";
-import { QueueSummarySchema } from "../gen/nebula/core/v1/queue_pb";
+import type { RunState } from "../gen/nebula/core/v1/run_pb";
+import type { ClockMode } from "./clock";
+import { isScriptName } from "./runs/scripts";
 import { mockSchema } from "./fixtures";
 import { store } from "./state";
 
@@ -70,11 +72,50 @@ export const scenarios = {
     });
   },
 
-  /** Changes the queue counts, as a submitted or finished Run would. */
-  setQueue(queued: number, running: number): void {
-    store.setQueue(
-      create(QueueSummarySchema, { ...store.queue, queued, running }),
-    );
+  /** The next submitted Run follows this script (A§3.4 to A§3.7). */
+  scriptNextRun(name: string): void {
+    if (!isScriptName(name)) throw new Error(`No run script ${name}`);
+    store.engine.scriptNextRun(name);
+  },
+
+  /**
+   * "manual" holds scripted Runs still until advanced, so tests can see
+   * intermediate states; "auto" runs them on real timers.
+   */
+  setRunMode(mode: ClockMode): void {
+    store.clock.setMode(mode);
+  },
+
+  /** Real milliseconds per mock millisecond in "auto" mode. */
+  setTiming(scale: number): void {
+    store.clock.setScale(scale);
+  },
+
+  /** Advances mock time by `ms`, running what falls due. */
+  advance(ms: number): void {
+    store.clock.advance(ms);
+  },
+
+  /** Advances mock time until the Run reaches `state` (a RunState). */
+  runUntil(runId: string, state: RunState): void {
+    try {
+      store.clock.advanceUntil(() => store.engine.run(runId)?.state === state);
+    } catch (error) {
+      const run = store.engine.run(runId);
+      throw new Error(
+        `${runId} did not reach state ${state}: it is ${run ? run.state : "missing"} (${String(error)})`,
+      );
+    }
+  },
+
+  /** Later attempts and Runs record this engine build (D62, D130). */
+  setEngineBuild(build: string): void {
+    store.engineBuild = build;
+  },
+
+  /** The GPU model later attempts run on (D149). */
+  setGpuModel(model: string): void {
+    store.gpuModel = model;
   },
 };
 

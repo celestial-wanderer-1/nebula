@@ -672,16 +672,17 @@ export function entityFixtures(): EntityRecord[] {
       { componentId: "cmp-pf2", turns: 120, seriesGroup: 0 },
     ],
   };
+  const mainComponents = [
+    componentRef("cmp-pf1"),
+    componentRef("cmp-pf2", { pinned: "sha256:pf2-v1" }),
+    componentRef("cmp-saddle"),
+    componentRef("cmp-vessel"),
+    componentRef("cmp-feed"),
+    componentRef("cmp-limiter"),
+  ];
   const main = geometry(
     { axisymmetric: true, fieldPeriods: 1 },
-    [
-      componentRef("cmp-pf1"),
-      componentRef("cmp-pf2", { pinned: "sha256:pf2-v1" }),
-      componentRef("cmp-saddle"),
-      componentRef("cmp-vessel"),
-      componentRef("cmp-feed"),
-      componentRef("cmp-limiter"),
-    ],
+    mainComponents,
     [
       pfCircuit,
       // An open lead on its own: flagged as not closed (D145).
@@ -705,7 +706,12 @@ export function entityFixtures(): EntityRecord[] {
         version("sha256:geo-v1", "2026-09-10T12:00:00Z", "r-03", 3),
       ],
       versionContents: {
-        "sha256:geo-v2": main,
+        // The feed circuit was added to the draft after geo-v2.
+        "sha256:geo-v2": geometry(
+          { axisymmetric: true, fieldPeriods: 1 },
+          mainComponents,
+          [pfCircuit],
+        ),
         "sha256:geo-v1": geometry(
           { axisymmetric: true, fieldPeriods: 1 },
           [componentRef("cmp-pf1"), componentRef("cmp-vessel")],

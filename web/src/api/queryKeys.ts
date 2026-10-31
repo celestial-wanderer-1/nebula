@@ -9,6 +9,7 @@ export const queryKeys = {
   plugins: () => [GLOBAL, "plugins"] as const,
   templates: () => [GLOBAL, "templates"] as const,
   projects: () => [GLOBAL, "projects"] as const,
+  queue: () => [GLOBAL, "queue", "entries"] as const,
   queueSummary: () => [GLOBAL, "queue", "summary"] as const,
   telemetry: () => [GLOBAL, "telemetry"] as const,
   project: (projectId: string) => [projectId] as const,

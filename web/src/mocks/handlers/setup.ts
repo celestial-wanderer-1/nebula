@@ -4,8 +4,6 @@ import {
   ListInputDatasetsResponseSchema,
 } from "../../gen/nebula/core/v1/dataset_pb";
 import { EntityDraftSchema } from "../../gen/nebula/core/v1/entity_pb";
-import { ListRunOutputsResponseSchema } from "../../gen/nebula/core/v1/output_pb";
-import { ListRunsResponseSchema } from "../../gen/nebula/core/v1/run_pb";
 import {
   InstantiateWorkflowRequestSchema,
   ListWorkflowTemplatesResponseSchema,
@@ -16,9 +14,9 @@ import { store } from "../state";
 import { created, notFound, proto, readProto, reply } from "./util";
 
 /**
- * Setup and run resources (docs/UI.md 6.4, 6.5): workflow templates and
- * validation, input datasets, and Runs with their committed outputs.
- * Registered before the generic entity handlers.
+ * Setup resources (docs/UI.md 6.4, 6.5): workflow templates and
+ * validation, and input datasets. Registered before the generic entity
+ * handlers.
  */
 export const setupHandlers = [
   http.get("/projects/:projectId/workflow-templates", ({ params }) => {
@@ -78,20 +76,5 @@ export const setupHandlers = [
       ),
       (dataset) => proto(InputDatasetSchema, dataset, created),
     );
-  }),
-
-  http.get("/projects/:projectId/runs", ({ params }) => {
-    const projectId = String(params.projectId);
-    if (!store.project(projectId)) return notFound("Project");
-    return proto(ListRunsResponseSchema, { runs: store.runList(projectId) });
-  }),
-
-  http.get("/projects/:projectId/runs/:runId/outputs", ({ params }) => {
-    const run = store.run(String(params.projectId), String(params.runId));
-    return run
-      ? proto(ListRunOutputsResponseSchema, {
-          outputs: store.runOutputs(run.id),
-        })
-      : notFound("Run");
   }),
 ];

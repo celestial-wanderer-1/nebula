@@ -1,12 +1,13 @@
 import { create } from "@bufbuild/protobuf";
 import { anyPack, type Any } from "@bufbuild/protobuf/wkt";
 import { useId, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { NotFoundError } from "../../api/errors";
 import { usePlugins } from "../../api/plugins";
 import { useValidateWorkflow } from "../../api/workflows";
 import { packAs, unpackAs } from "../../entities/content";
 import { DraftEditorHeader } from "../../entities/DraftEditorHeader";
+import { SubmitRunDialog } from "../../entities/SubmitRunDialog";
 import { useDraft } from "../../entities/useDraft";
 import { VersionList } from "../../entities/VersionList";
 import { newMessage } from "../../forms/defaults";
@@ -40,6 +41,7 @@ import {
   stepKindOf,
 } from "../../workflow/ports";
 import { AdapterOffer } from "./AdapterOffer";
+import { RerunBanner } from "./RerunBanner";
 import type { FlowCanvasProps } from "./FlowCanvas";
 import { NodeIssues, NodePanel } from "./NodePanel";
 import { Palette, type CoreKind } from "./Palette";
@@ -115,6 +117,9 @@ function Editor({
   }>();
   const [notice, setNotice] = useState<string>();
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const rerunOf = params.get("rerun") ?? undefined;
 
   const issueList = validate.data?.issues;
   const issues = useMemo(
@@ -225,7 +230,6 @@ function Editor({
           </button>
           <button
             type="button"
-            className="primary"
             disabled={unsaved || validate.isPending}
             aria-describedby={unsaved ? `${ids}-validate-wait` : undefined}
             onClick={() => {
@@ -235,12 +239,29 @@ function Editor({
           >
             Validate
           </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={unsaved}
+            aria-describedby={unsaved ? `${ids}-validate-wait` : undefined}
+            onClick={() => setSubmitting(true)}
+          >
+            Run…
+          </button>
         </div>
       </div>
+      {rerunOf && (
+        <RerunBanner
+          projectId={projectId}
+          runId={rerunOf}
+          onLoad={(content) => draft.setContent(content)}
+          onDone={() => setParams({}, { replace: true })}
+        />
+      )}
       {unsaved && (
         <p id={`${ids}-validate-wait`} className="muted small">
-          Validation checks the saved draft; it waits until your edits are
-          saved.
+          Validation and runs use the saved draft; they wait until your edits
+          are saved.
         </p>
       )}
       <DraftEditorHeader draft={draft} label="Workflow name" />
@@ -347,6 +368,14 @@ function Editor({
         </aside>
       </div>
 
+      <SubmitRunDialog
+        projectId={projectId}
+        workflowId={workflowId}
+        revision={draft.draft.revision}
+        rerunOf={rerunOf}
+        open={submitting}
+        onOpenChange={setSubmitting}
+      />
       <AdapterOffer
         offer={offer}
         onCancel={() => setOffer(undefined)}

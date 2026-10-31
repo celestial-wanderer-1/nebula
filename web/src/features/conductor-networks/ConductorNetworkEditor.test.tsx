@@ -20,7 +20,7 @@ describe("ConductorNetworkEditor", () => {
     const circuit = await screen.findByRole("listitem", { name: "Circuits 1" });
     const select = within(circuit).getByLabelText("Circuit");
     await waitFor(() =>
-      expect(within(select).getByText("Feed (ckt-feed)")).toBeInTheDocument(),
+      expect(within(select).getByText("PF (ckt-pf)")).toBeInTheDocument(),
     );
     expect(within(circuit).getByLabelText("Power supply")).toHaveValue(
       "sup-pf",

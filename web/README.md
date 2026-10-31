@@ -49,7 +49,7 @@ These implementation details are what the FastAPI server must match:
   `If-Match: "<revision>"`; a stale revision returns 409 with a `DraftConflict`
   body.
 - WebSocket frames are protobuf JSON text of the channel's message
-  (`EntityChange`, `QueueEvent`, `TelemetryEvent`).
+  (`EntityChange`, `QueueEvent`, `RunEvent`, `TelemetryEvent`).
 - The UI refuses a server whose `/version` `api_version` differs from
   `UI_API_VERSION` in `src/api/version.ts`.
 - Entities are created with `POST /projects/{p}/{segment}` and a
@@ -131,6 +131,44 @@ These implementation details are what the FastAPI server must match:
   returns 422.
 - `GET /projects/{p}/runs` returns a `ListRunsResponse`, newest first, and
   `GET /projects/{p}/runs/{r}/outputs` returns a `ListRunOutputsResponse`.
+
+- `POST /projects/{p}/runs` takes a `SubmitRunRequest` and returns a
+  `SubmitRunResponse`. The server validates the workflow's saved draft and
+  resolves the cache. With `dry_run` it only reports: the drafts it would
+  mint (`DraftToMint`, dependencies first, `reuses_version` when the content
+  equals an existing version), the cached steps, the default GPU count, the
+  installed GPUs and the allowed counts. Otherwise it mints every reached
+  draft in one pass, rewriting `draft` and `latest` references to `pinned`
+  in the minted versions, and returns 201 with the `Run`. That Run is
+  `RUN_STATE_COMPLETED` with `cache_hit` when every step is cached; its
+  outputs then carry `producer_run_id`. A request with blocking issues
+  returns 200 with the `issues` and no `run`. `gpus` 0 takes the default.
+- `GET /projects/{p}/runs/{r}` returns the `Run`.
+  `POST /projects/{p}/runs/{r}/actions` takes a `RunActionRequest` (pause,
+  resume, cancel, discard) and returns the `Run`, or 409 `invalid_state`
+  when the state does not allow it (A§14.1). Resume needs `RUN_STATE_PAUSED`,
+  or `RUN_STATE_FAILED` with a transient reason (`oom`, `crashed`,
+  `supervisor_lost`) and `has_checkpoint` on the last attempt.
+  `POST /projects/{p}/runs/{r}/rerun` takes a `RerunRequest` (same or latest
+  inputs) and returns 201 with the new `Run`. "Re-run with edited workflow"
+  is a submission with `rerun_of` set.
+- `GET /queue` returns a `ListQueueResponse`: waiting Runs in FIFO order
+  (`position` from 1), then running and paused ones. `POST /queue/reorder`
+  takes a `ReorderQueueRequest` and returns 204, or 409 for a Run that is not
+  waiting. `POST /queue/{r}/cancel` cancels a Run of any project.
+- `/ws/queue` sends `summary` and `entries` on connect and whenever they
+  change, plus a `run_state` event per Run state change.
+- `/ws/runs/{r}` sends `RunEvent`s: a `run` snapshot on connect and on every
+  state change, which replaces what the client holds, then step status,
+  residuals, structured log lines, committed outputs and checkpoints. On
+  connect the server first replays the recent progress it holds (the mock
+  keeps 400 events per Run). The client keeps progress in bounded buffers
+  and starts them over on every connect.
+- Mock builds also expose run controls on `window.__nebulaMock`:
+  `scriptNextRun(name)` (success, slow, oom, diverged, nan, crashed,
+  supervisor_lost, geometry_failed), `setRunMode("manual" | "auto")`,
+  `advance(ms)`, `runUntil(runId, state)`, `setTiming(scale)`,
+  `setEngineBuild(build)` and `setGpuModel(model)`.
 
 ## Bundles
 

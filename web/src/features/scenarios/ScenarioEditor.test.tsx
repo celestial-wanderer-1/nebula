@@ -31,7 +31,7 @@ async function open() {
 }
 
 describe("ScenarioEditor", () => {
-  it("keys currents by the circuits of the pinned geometry version (D114)", async () => {
+  it("keys currents by the circuits of the referenced geometry (D114)", async () => {
     const currents = await open();
     const rows = within(currents).getAllByRole("row").slice(1);
     expect(rows.map((row) => row.dataset.circuit)).toEqual([
@@ -53,11 +53,13 @@ describe("ScenarioEditor", () => {
 
   it("flags currents of circuits the chosen geometry version lacks", async () => {
     const currents = await open();
-    // geo-v1 has only the PF circuit.
+    // The draft has a feed circuit; the head version geo-v2 does not.
     const picker = screen.getByRole("group", { name: "Geometry" });
-    await userEvent.selectOptions(
-      within(picker).getByLabelText("Version"),
-      "sha256:geo-v1",
+    await userEvent.click(
+      within(picker).getByRole("radio", { name: "Pinned version" }),
+    );
+    expect(within(picker).getByLabelText("Version")).toHaveValue(
+      "sha256:geo-v2",
     );
     await waitFor(() =>
       expect(within(currents).getByText("Not in the geometry")).toBeVisible(),
@@ -124,13 +126,14 @@ describe("ScenarioEditor", () => {
     );
     await userEvent.selectOptions(geometry, "geo-main");
     const currents = screen.getByRole("region", { name: "Circuit currents" });
+    // A new reference pins the head version, geo-v2, with its PF circuit.
     await userEvent.click(
       await within(currents).findByRole("button", {
-        name: "Set current of Feed",
+        name: "Set current of PF",
       }),
     );
     expect(
-      within(currents).getByRole("textbox", { name: "Current of Feed" }),
+      within(currents).getByRole("textbox", { name: "Current of PF" }),
     ).toHaveValue("0");
   });
 });

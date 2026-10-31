@@ -1,6 +1,7 @@
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { useQuery } from "@tanstack/react-query";
 import { useId, type ReactNode } from "react";
+import { Link } from "react-router";
 import { draftQueryOptions, useVersions } from "../api/entities";
 import {
   MintedBy,
@@ -104,7 +105,16 @@ export function VersionList({
                   <code title={version.hash}>{shortHash(version.hash)}</code>{" "}
                   <span>{MINTED_BY[version.mintedBy] ?? "Unknown origin"}</span>
                   {version.sourceId && (
-                    <span className="muted"> ({version.sourceId})</span>
+                    <span className="muted">
+                      {" "}
+                      (
+                      <Link
+                        to={`/p/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(version.sourceId)}`}
+                      >
+                        {version.sourceId}
+                      </Link>
+                      )
+                    </span>
                   )}{" "}
                   <span className="muted">{formatTime(version.mintedAt)}</span>
                   {version.hash === headHash && (

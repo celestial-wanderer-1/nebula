@@ -166,7 +166,7 @@ describe("WorkflowEditor", () => {
   });
 
   it("shows the server's validation issues on their nodes", async () => {
-    renderRoute(`/p/${P}/workflows/wf-chain`);
+    renderRoute(`/p/${P}/workflows/wf-scratch`);
     const validate = await screen.findByRole("button", { name: "Validate" });
     await userEvent.click(validate);
     const result = await screen.findByRole("region", { name: "Validation" });
@@ -270,5 +270,98 @@ describe("WorkflowEditor", () => {
         expect(savedWorkflow(id).nodes.map((n) => n.id)).toEqual(["coupled-2"]),
       { timeout: 3000 },
     );
+  });
+
+  it("submits the saved draft; an unchanged workflow is a full cache hit", async () => {
+    const { router } = renderRoute(`/p/${P}/workflows/wf-chain`);
+    await userEvent.click(await screen.findByRole("button", { name: "Run…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Run workflow" });
+    const summary = within(dialog).getByRole("region", {
+      name: "Submission summary",
+    });
+    await waitFor(() =>
+      expect(summary).toHaveTextContent(
+        "All 3 steps are cached: the run completes at once.",
+      ),
+    );
+    expect(summary).toHaveTextContent(
+      "None: every input is already a version.",
+    );
+    expect(within(dialog).getByLabelText("GPUs")).toHaveValue("1");
+    // Fast mode is another cache key (D77): nothing is cached then.
+    await userEvent.click(within(dialog).getByRole("radio", { name: /^Fast/ }));
+    await waitFor(() =>
+      expect(summary).toHaveTextContent("No step is cached."),
+    );
+    await userEvent.click(
+      within(dialog).getByRole("radio", { name: /^Deterministic/ }),
+    );
+    await waitFor(() => expect(summary).toHaveTextContent("All 3 steps"));
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Submit run" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toMatch(/\/runs\/r-1\d\d$/),
+    );
+    expect(await screen.findByText("cache hit")).toBeVisible();
+  });
+
+  it("lists the drafts a submission mints (A§4.2)", async () => {
+    renderRoute(`/p/${P}/workflows/wf-scratch`);
+    await userEvent.click(await screen.findByRole("button", { name: "Run…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Run workflow" });
+    const minted = await within(dialog).findByRole("list", {
+      name: "Drafts to mint",
+    });
+    expect(minted).toHaveTextContent(
+      "Geometry “Baseline assembly” (draft revision 7)",
+    );
+    expect(minted).toHaveTextContent("Workflow “Field on the draft assembly”");
+    // The draft assembly's open feed circuit blocks the run (D145).
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "Fix before running",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Submit run" }),
+    ).toBeDisabled();
+  });
+
+  it("re-runs a Run with an edited workflow (D141)", async () => {
+    const { router } = renderRoute(`/p/${P}/workflows/wf-chain?rerun=r-03`);
+    const banner = await screen.findByRole("region", { name: "Re-run" });
+    const load = within(banner).getByRole("button", {
+      name: "Load its workflow into the draft",
+    });
+    await waitFor(() => expect(load).toBeEnabled());
+    await userEvent.click(load);
+    expect(banner).toHaveTextContent("Its workflow version is in the draft");
+    await waitFor(
+      () =>
+        expect(savedWorkflow("wf-chain").nodes[0]?.kind.value).toMatchObject({
+          bindings: expect.arrayContaining([
+            expect.objectContaining({
+              ref: expect.objectContaining({
+                state: {
+                  case: "pinned",
+                  value: expect.objectContaining({
+                    versionHash: "sha256:geo-v1",
+                  }),
+                },
+              }),
+            }),
+          ]),
+        }),
+      { timeout: 3000 },
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Run…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Re-run r-03" });
+    const submit = within(dialog).getByRole("button", { name: "Submit run" });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await userEvent.click(submit);
+    await waitFor(() =>
+      expect(router.state.location.pathname).toMatch(/\/runs\/r-1/),
+    );
+    const id = router.state.location.pathname.split("/").pop()!;
+    expect(store.engine.run(id)?.rerunOf).toBe("r-03");
   });
 });

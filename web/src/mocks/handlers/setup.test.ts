@@ -94,11 +94,20 @@ describe("setup handlers", () => {
     const { issues } = (await json(response)) as {
       issues: { path: string; code: string }[];
     };
-    // geo-main's feed circuit is an open lead (D145); 3 GPUs is no rank
-    // count of T1 (D116).
+    // 3 GPUs is no rank count of T1 (D116).
     expect(issues.map((i) => `${i.path} ${i.code}`)).toEqual([
-      "nodes/field/ports/geometry circuit",
       "nodes/t1 rank_count",
+    ]);
+    // The draft assembly's feed circuit is an open lead (D145).
+    const scratch = (await json(
+      await call(
+        "/projects/p-baseline/workflows/wf-scratch/validate",
+        "POST",
+        "{}",
+      ),
+    )) as { issues: { path: string; code: string }[] };
+    expect(scratch.issues.map((i) => `${i.path} ${i.code}`)).toEqual([
+      "nodes/field/ports/geometry circuit",
     ]);
   });
 

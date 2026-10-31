@@ -60,16 +60,17 @@ import {
   type Project,
   type Template,
 } from "../gen/nebula/core/v1/project_pb";
-import {
-  QueueSummarySchema,
-  type QueueSummary,
-} from "../gen/nebula/core/v1/queue_pb";
+import type { QueueSummary } from "../gen/nebula/core/v1/queue_pb";
 import {
   InputDatasetSchema,
   type InputDataset,
 } from "../gen/nebula/core/v1/dataset_pb";
 import type { RunOutput } from "../gen/nebula/core/v1/output_pb";
-import type { Run } from "../gen/nebula/core/v1/run_pb";
+import {
+  ProvenanceTag,
+  RunSchema,
+  type Run,
+} from "../gen/nebula/core/v1/run_pb";
 import {
   WorkflowSchema,
   type WorkflowTemplate,
@@ -97,6 +98,9 @@ import {
   type InputRecord,
 } from "./setupFixtures";
 import { conceptTraits } from "./extensions";
+import { MockClock } from "./clock";
+import type { RunEngine } from "./runs/engine";
+import { ENGINE_BUILD, startEngine } from "./runs/service";
 import { checkGeometry, tessellateShape } from "./tessellate";
 import { validateWorkflow } from "./workflows/validate";
 import { MOCK_BUILD_ID } from "./token";
@@ -162,19 +166,35 @@ export class MockStore {
   entities: EntityRecord[] = [];
   materials: MaterialRecord[] = [];
   library: LibraryState = { components: [], materials: [] };
-  queue: QueueSummary = create(QueueSummarySchema);
-  runs: Run[] = [];
-  outputs: RunOutput[] = [];
   inputs: InputRecord[] = [];
   workflowTemplates: WorkflowTemplate[] = [];
   /** API version `/version` reports; scenarios change it. */
   apiVersion = "";
   private nextId = 1;
   private readonly entityListeners = new Set<(change: EntityChange) => void>();
-  private readonly queueListeners = new Set<(summary: QueueSummary) => void>();
+  /** Drives scripted Runs; manual in unit tests (docs/UI.md Section 7). */
+  readonly clock: MockClock;
+  engine!: RunEngine;
+  /** Engine build and GPU model of this installation (D126, D149). */
+  engineBuild = ENGINE_BUILD;
+  gpuModel = "MI300X";
 
-  constructor(apiVersion: string) {
+  constructor(apiVersion: string, clock = new MockClock({ mode: "manual" })) {
+    this.clock = clock;
     this.reset(apiVersion);
+  }
+
+  get runs(): Run[] {
+    return this.engine.runs;
+  }
+
+  get outputs(): RunOutput[] {
+    return this.engine.outputs;
+  }
+
+  /** Queue counts shared across projects (D100, D102). */
+  get queue(): QueueSummary {
+    return this.engine.summary();
   }
 
   reset(apiVersion: string): void {
@@ -184,19 +204,15 @@ export class MockStore {
     this.entities = entityFixtures();
     this.materials = materialFixtures();
     this.library = libraryFixtures();
-    this.runs = runFixtures();
-    this.outputs = outputFixtures();
     this.inputs = inputFixtures();
     this.workflowTemplates = workflowTemplateFixtures();
-    this.queue = create(QueueSummarySchema, {
-      queued: 2,
-      preparing: 0,
-      running: 1,
-      gpusTotal: 4,
-      gpusBusy: 1,
-    });
     this.apiVersion = apiVersion;
     this.nextId = 1;
+    this.engineBuild = ENGINE_BUILD;
+    this.gpuModel = "MI300X";
+    this.engine?.stop();
+    this.clock.cancelAll();
+    this.engine = startEngine(this, runFixtures(), outputFixtures());
   }
 
   private newId(prefix: string): string {
@@ -249,6 +265,9 @@ export class MockStore {
       format: EXPORT_FORMAT,
       buildId: MOCK_BUILD_ID,
       project: toJson(ProjectSchema, project),
+      runs: this.runList(projectId).map((run) =>
+        toJson(RunSchema, run, { registry: mockSchema.typeRegistry }),
+      ),
     });
   }
 
@@ -263,7 +282,12 @@ export class MockStore {
         }),
       ],
     });
-    let snapshot: { format?: unknown; buildId?: unknown; project?: unknown };
+    let snapshot: {
+      format?: unknown;
+      buildId?: unknown;
+      project?: unknown;
+      runs?: unknown;
+    };
     try {
       snapshot = JSON.parse(text) as typeof snapshot;
     } catch {
@@ -284,7 +308,28 @@ export class MockStore {
       updatedAt: timestampNow(),
     });
     const issues = [];
-    if (snapshot.buildId !== MOCK_BUILD_ID && project.runCount > 0) {
+    const foreign = snapshot.buildId !== MOCK_BUILD_ID;
+    // Runs come along, judged per Run against this build (D100, D149).
+    for (const json of Array.isArray(snapshot.runs) ? snapshot.runs : []) {
+      try {
+        const run = fromJson(RunSchema, json as JsonValue, {
+          registry: mockSchema.typeRegistry,
+          ignoreUnknownFields: true,
+        });
+        run.id = this.engine.newRunId();
+        run.projectId = project.id;
+        if (
+          foreign &&
+          !run.tags.includes(ProvenanceTag.NOT_REPRODUCIBLE_HERE)
+        ) {
+          run.tags.push(ProvenanceTag.NOT_REPRODUCIBLE_HERE);
+        }
+        this.engine.runs.push(run);
+      } catch {
+        // A Run the import cannot read is skipped; the project still opens.
+      }
+    }
+    if (foreign && project.runCount > 0) {
       project.nonReproducibleRunCount = project.runCount;
       issues.push(
         create(ValidationIssueSchema, {
@@ -400,7 +445,7 @@ export class MockStore {
     }
   }
 
-  // Runs and outputs (A§13.2). P4 adds submission and the queue.
+  // Runs and outputs (A§13.2); submission is in runs/service.ts.
 
   runList(projectId: string): Run[] {
     return this.runs.filter((run) => run.projectId === projectId);
@@ -411,7 +456,7 @@ export class MockStore {
   }
 
   runOutputs(runId: string): RunOutput[] {
-    return this.outputs.filter((output) => output.runId === runId);
+    return this.engine.runOutputs(runId);
   }
 
   // Input datasets (D144).
@@ -884,13 +929,18 @@ export class MockStore {
     return { ok: true, draft: record.draft };
   }
 
-  publishEntity(record: EntityRecord, change: ChangeType): void {
+  publishEntity(
+    record: EntityRecord,
+    change: ChangeType,
+    versionHash = "",
+  ): void {
     const event = create(EntityChangeSchema, {
       projectId: record.projectId,
       kind: record.draft.kind,
       id: record.draft.id,
       change,
       revision: record.draft.revision,
+      versionHash,
     });
     for (const listener of this.entityListeners) listener(event);
   }
@@ -898,16 +948,6 @@ export class MockStore {
   onEntityChange(listener: (change: EntityChange) => void): () => void {
     this.entityListeners.add(listener);
     return () => this.entityListeners.delete(listener);
-  }
-
-  setQueue(summary: QueueSummary): void {
-    this.queue = summary;
-    for (const listener of this.queueListeners) listener(summary);
-  }
-
-  onQueueChange(listener: (summary: QueueSummary) => void): () => void {
-    this.queueListeners.add(listener);
-    return () => this.queueListeners.delete(listener);
   }
 }
 

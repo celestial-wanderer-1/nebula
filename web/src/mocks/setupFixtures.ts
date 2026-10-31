@@ -12,6 +12,7 @@ import {
 } from "../gen/nebula/core/v1/output_pb";
 import { RegionSchema } from "../gen/nebula/core/v1/region_pb";
 import {
+  DeterminismMode,
   ProvenanceTag,
   RunSchema,
   RunState,
@@ -525,12 +526,13 @@ export function baselineSetup(): EntityRecord[] {
       },
     },
   });
-  const flattop = (pf: number) =>
+  const flattop = (pf: number, feed = false) =>
     scenarioFixture({
-      geometry: geoV2,
+      geometry: feed ? entityRef(EntityKind.GEOMETRY, "geo-main") : geoV2,
       currents: [
         { circuitId: "ckt-pf", current: pf },
-        { circuitId: "ckt-feed", current: 1.0e3 },
+        // The draft feeds the circuit geo-main's draft added since geo-v2.
+        ...(feed ? [{ circuitId: "ckt-feed", current: 1.0e3 }] : []),
       ],
       plasmaTargets: [
         plasma({
@@ -619,8 +621,8 @@ export function baselineSetup(): EntityRecord[] {
       kind: EntityKind.SCENARIO,
       id: "scn-flattop",
       name: "Flat-top",
-      revision: 4,
-      content: flattop(4.6e4),
+      revision: 5,
+      content: flattop(4.6e4, true),
       versions: [
         version("sha256:scn-v2", "2026-10-20T12:00:00Z", "r-11", 4),
         version("sha256:scn-v1", "2026-09-10T12:00:00Z", "r-03", 2),
@@ -638,6 +640,28 @@ export function baselineSetup(): EntityRecord[] {
       content: network,
       versions: [version("sha256:cn-v1", "2026-09-10T12:00:00Z", "r-03", 2)],
       versionContents: { "sha256:cn-v1": network },
+    }),
+    entity(p, {
+      kind: EntityKind.WORKFLOW,
+      id: "wf-scratch",
+      name: "Field on the draft assembly",
+      revision: 2,
+      content: pack(WorkflowSchema, {
+        nodes: [
+          step(
+            "field",
+            "solver",
+            "nebula.field.biot_savart",
+            "Biot–Savart field",
+            0,
+            80,
+            fieldBindings({
+              geometry: { id: "geo-main" },
+              scenario: { id: "scn-flattop" },
+            }),
+          ),
+        ],
+      }),
     }),
     entity(p, {
       kind: EntityKind.WORKFLOW,
@@ -668,6 +692,8 @@ export function runFixtures(): Run[] {
       workflowId: "wf-chain",
       workflowVersionHash: "sha256:wf-v2",
       state: RunState.RUNNING,
+      // Fast mode is part of the cache key, so it does not reuse r-11.
+      mode: DeterminismMode.FAST,
       submittedAt: at("2026-10-30T07:40:00Z"),
     }),
     run({

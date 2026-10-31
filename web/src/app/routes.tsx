@@ -3,6 +3,7 @@ import { conductorNetworkRoutes } from "../features/conductor-networks/routes";
 import { geometryRoutes } from "../features/geometry/routes";
 import { libraryRoutes } from "../features/libraries/routes";
 import { regionRoutes } from "../features/regions/routes";
+import { runRoutes } from "../features/runs/routes";
 import { scenarioRoutes } from "../features/scenarios/routes";
 import { workflowRoutes } from "../features/workflows/routes";
 import { ProjectBrowser } from "../features/projects/ProjectBrowser";
@@ -20,6 +21,7 @@ const builtAreas: RouteObject[] = [
   ...scenarioRoutes,
   ...conductorNetworkRoutes,
   ...workflowRoutes,
+  ...runRoutes,
 ];
 const built = new Set(builtAreas.map((route) => route.path?.split("/")[0]));
 
