@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
-import { createProject, TOKEN, trackErrors } from "./helpers";
+import { expect, test } from "./test";
+import { createProject, TOKEN } from "./helpers";
 
 const foreignExport = fileURLToPath(
   new URL("./fixtures/foreign-build.nebula", import.meta.url),
@@ -27,7 +27,6 @@ test("refuses an incompatible server", async ({ page }) => {
 test("creates a project from each reference concept kit and reopens it", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   for (const kit of ["Tokamak", "Simple mirror", "Stellarator"]) {
     await createProject(page, `${kit} starter`, `E2E ${kit}`);
@@ -45,11 +44,9 @@ test("creates a project from each reference concept kit and reopens it", async (
   await expect(
     page.getByRole("heading", { name: "E2E Stellarator", level: 1 }),
   ).toBeVisible();
-  expect(errors).toEqual([]);
 });
 
 test("exports a project and imports it back", async ({ page }, testInfo) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Tokamak baseline" }).click();
@@ -69,7 +66,6 @@ test("exports a project and imports it back", async ({ page }, testInfo) => {
   await expect(
     page.getByRole("link", { name: "Tokamak baseline" }),
   ).toHaveCount(2);
-  expect(errors).toEqual([]);
 });
 
 test("marks runs of an import from another build as not reproducible", async ({
@@ -108,7 +104,6 @@ test("marks runs of an import from another build as not reproducible", async ({
 test("opens direct project URLs, scrubs the token and needs it again after reload", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await page.goto(`/p/p-baseline/workflows${TOKEN}`);
   await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible();
   await expect(
@@ -125,5 +120,4 @@ test("opens direct project URLs, scrubs the token and needs it again after reloa
   await expect(
     page.getByRole("heading", { name: "Open Nebula from its launch URL" }),
   ).toBeVisible();
-  expect(errors).toEqual([]);
 });

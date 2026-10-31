@@ -206,7 +206,7 @@ describe("WorkflowEditor", () => {
       selector: "select",
     });
     await waitFor(() =>
-      expect(within(output).getAllByRole("option").length).toBe(6),
+      expect(within(output).getAllByRole("option").length).toBe(7),
     );
     await userEvent.selectOptions(output, "t1/equilibrium");
     expect(stored).toHaveTextContent("Pinned to");

@@ -156,3 +156,25 @@ describe("WsManager", () => {
     off();
   });
 });
+
+describe("WsManager.send", () => {
+  it("queues frames until the channel opens, then sends them", async () => {
+    const { instance } = manager();
+    const received: string[] = [];
+    server.use(
+      ws.link(/\/ws\/echo$/).addEventListener("connection", ({ client }) => {
+        client.addEventListener("message", (event) => {
+          received.push(String(event.data));
+          client.send(summaryFrame(received.length));
+        });
+      }),
+    );
+    expect(instance.send("/ws/echo", "early")).toBe(false);
+    const off = instance.subscribe("/ws/echo", QueueEventSchema, () => {});
+    expect(instance.send("/ws/echo", "first")).toBe(true);
+    await vi.waitFor(() => expect(received).toEqual(["first"]));
+    instance.send("/ws/echo", "second");
+    await vi.waitFor(() => expect(received).toEqual(["first", "second"]));
+    off();
+  });
+});

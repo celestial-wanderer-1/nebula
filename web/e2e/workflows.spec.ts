@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
-import { createProject, TOKEN, trackErrors } from "./helpers";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./test";
+import { createProject, TOKEN } from "./helpers";
 
 // docs/UI.md 6.5: a full chain and a single step fed by a stored output,
 // both accepted by the server; typed ports block mismatches and offer
@@ -83,7 +84,6 @@ async function bindChain(page: Page) {
 test("builds the full chain from a template and the server accepts it", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   await createProject(page, "Tokamak starter", "E2E chain");
   await openWorkflows(page);
@@ -124,13 +124,11 @@ test("builds the full chain from a template and the server accepts it", async ({
   await expect((await validate(page)).getByRole("status")).toHaveText(
     "No issues: the server accepts this workflow.",
   );
-  expect(errors).toEqual([]);
 });
 
 test("runs a single stability step on a stored equilibrium", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await page.goto(`/p/p-baseline/workflows${TOKEN}`);
   await fromTemplate(
     page,
@@ -148,11 +146,9 @@ test("runs a single stability step on a stored equilibrium", async ({
   await expect((await validate(page)).getByRole("status")).toHaveText(
     "No issues: the server accepts this workflow.",
   );
-  expect(errors).toEqual([]);
 });
 
 test("reports a trait the project's concept lacks (D64)", async ({ page }) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   await createProject(page, "Simple mirror starter", "E2E mirror");
   await openWorkflows(page);
@@ -170,11 +166,9 @@ test("reports a trait the project's concept lacks (D64)", async ({ page }) => {
   await expect(
     page.getByTestId("flow-canvas").locator(".flow-node.has-issues"),
   ).toHaveCount(1);
-  expect(errors).toEqual([]);
 });
 
 test("connects typed ports by dragging on the canvas", async ({ page }) => {
-  const errors = trackErrors(page);
   await page.goto(`/p/p-baseline/workflows${TOKEN}`);
   await page.getByRole("button", { name: "New workflow" }).click();
   const dialog = page.getByRole("dialog", { name: "New workflow" });
@@ -200,5 +194,4 @@ test("connects typed ports by dragging on the canvas", async ({ page }) => {
     );
   await expect(canvas).toHaveAttribute("data-edges", "1");
   await expect(canvas.locator(".react-flow__edge")).toHaveCount(1);
-  expect(errors).toEqual([]);
 });

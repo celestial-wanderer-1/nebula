@@ -102,6 +102,7 @@ import { MockClock } from "./clock";
 import type { RunEngine } from "./runs/engine";
 import { ENGINE_BUILD, startEngine } from "./runs/service";
 import { checkGeometry, tessellateShape } from "./tessellate";
+import { ViewService } from "./views";
 import { validateWorkflow } from "./workflows/validate";
 import { MOCK_BUILD_ID } from "./token";
 
@@ -175,6 +176,8 @@ export class MockStore {
   /** Drives scripted Runs; manual in unit tests (docs/UI.md Section 7). */
   readonly clock: MockClock;
   engine!: RunEngine;
+  /** View jobs and their payload cache (A§3.6). */
+  readonly views = new ViewService(this);
   /** Engine build and GPU model of this installation (D126, D149). */
   engineBuild = ENGINE_BUILD;
   gpuModel = "MI300X";
@@ -213,6 +216,7 @@ export class MockStore {
     this.engine?.stop();
     this.clock.cancelAll();
     this.engine = startEngine(this, runFixtures(), outputFixtures());
+    this.views?.clear();
   }
 
   private newId(prefix: string): string {

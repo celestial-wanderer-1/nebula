@@ -49,7 +49,8 @@ These implementation details are what the FastAPI server must match:
   `If-Match: "<revision>"`; a stale revision returns 409 with a `DraftConflict`
   body.
 - WebSocket frames are protobuf JSON text of the channel's message
-  (`EntityChange`, `QueueEvent`, `RunEvent`, `TelemetryEvent`).
+  (`EntityChange`, `QueueEvent`, `RunEvent`, `TelemetryEvent`; on
+  `/ws/views`, `ViewRequest` from the client and `ViewReply` back).
 - The UI refuses a server whose `/version` `api_version` differs from
   `UI_API_VERSION` in `src/api/version.ts`.
 - Entities are created with `POST /projects/{p}/{segment}` and a
@@ -170,14 +171,53 @@ These implementation details are what the FastAPI server must match:
   `advance(ms)`, `runUntil(runId, state)`, `setTiming(scale)`,
   `setEngineBuild(build)` and `setGpuModel(model)`.
 
+- `/ws/views` is request and reply (A§3.6): the client sends a
+  `ViewRequest` with a fresh `request_id` per change of output, viewer or
+  `ViewParams`, and the server answers with a `ViewReply` carrying that ID,
+  a `ViewPayload` or an `ApiError` (`not_found`, `not_viewable`), and
+  `cached` for a payload-cache hit. Replies are not replayed after a
+  reconnect; the client resends its pending request. Payloads are Plotly
+  figures (`{"data", "layout"}` as a `Struct`), vtk.js polydata or binary
+  glTF. Polydata points are little-endian float32 relative to the payload
+  `origin`, and cells use the VTK layout (count, then point IDs) as
+  little-endian uint32. The client places the actor at the origin and never
+  adds it to the points (D156). A glTF with an external `uri` is refused
+  (D117).
+- A Run output's `kind` and, for fields on a region, `region_type` choose
+  its viewers; an `Extension`'s `views` (view descriptors) come first. A
+  `SCALARS` output carries its values inline in `scalars` (an `Any`). Time
+  series carry their `time` axis, and `ViewParams.time_index` picks a slice.
+
 ## Bundles
 
 Heavy views load lazily through `src/viewers/lazy.tsx`, so each library is
 a separate chunk fetched only where it is used: three.js and React Three
 Fiber with the geometry viewport and the region placement view, React Flow
-with the workflow canvas, and Plotly (its basic bundle, without the WebGL
+with the workflow canvas, vtk.js with the 2D contour, 3D field, Poincaré
+and mode-structure viewers, and Plotly (its basic bundle, without the WebGL
 traces) with charts. Headless Playwright runs draw WebGL views with software
 WebGL (SwiftShader; see `playwright.config.ts`).
+
+## Content Security Policy
+
+The bundle runs under a strict policy (D117): no inline or `eval`'d
+scripts, and style elements only with the page's nonce.
+`index.html` carries `<meta name="csp-nonce" content="NEBULA_CSP_NONCE">`.
+The server must replace the placeholder with a fresh random nonce per
+response and send it in its policy. The app passes the nonce to the
+libraries that insert `<style>` elements (Radix's scroll lock). Plotly
+inserts one empty `<style>` element and fills it through the CSSOM; the
+hash of the empty string admits only that. `vite preview` sends this policy
+with the placeholder as the nonce; Playwright fails any test that triggers a
+violation (`e2e/test.ts`):
+
+```text
+default-src 'none'; script-src 'self';
+style-src 'self' 'nonce-<nonce>' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws: wss:;
+worker-src 'self' blob:; manifest-src 'self'; base-uri 'none';
+form-action 'none'; frame-ancestors 'none'; object-src 'none'
+```
 
 ## Static serving contract
 

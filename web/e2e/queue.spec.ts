@@ -1,10 +1,9 @@
-import { expect, test } from "@playwright/test";
-import { mock, TOKEN, trackErrors } from "./helpers";
+import { expect, test } from "./test";
+import { mock, TOKEN } from "./helpers";
 
 // D102, D142: a FIFO queue shared across projects, reorder and cancel.
 
 test("reorders and cancels waiting runs", async ({ page }) => {
-  const errors = trackErrors(page);
   await page.goto(`/p/p-baseline/workflows/wf-chain${TOKEN}`);
   await mock(page, "setRunMode", "manual");
   for (const [gpus, name] of [
@@ -46,5 +45,4 @@ test("reorders and cancels waiting runs", async ({ page }) => {
   await expect(page.getByRole("status", { name: "Queue" })).toContainText(
     "0 queued",
   );
-  expect(errors).toEqual([]);
 });

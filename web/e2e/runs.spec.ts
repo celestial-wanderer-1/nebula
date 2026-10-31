@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
-import { createProject, mock, TOKEN, trackErrors } from "./helpers";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./test";
+import { createProject, mock, TOKEN } from "./helpers";
 
 // A§3.4 and A§3.5: submit, mint, queue, prepare, run with live progress,
 // commit outputs and complete; an unchanged resubmission is a cache hit.
@@ -18,7 +19,6 @@ async function openDefaultWorkflow(page: Page) {
 test("submits a run that mints its drafts and completes with live progress", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   await mock(page, "setTiming", 0.2);
   await createProject(page, "Tokamak starter", "E2E runs");
@@ -74,5 +74,4 @@ test("submits a run that mints its drafts and completes with live progress", asy
   await expect(state.getByText("cache hit")).toBeVisible();
   await expect(state.locator(".badge").first()).toHaveText("Completed");
   await expect(steps).toContainText(`Cached from ${runId}`);
-  expect(errors).toEqual([]);
 });

@@ -77,6 +77,7 @@ describe("run lifecycle (A§3.4, A§14.1)", () => {
       "field.operator",
       "t1.equilibrium",
       "t1.lcfs",
+      "t1.scalars",
       "flux.equilibrium",
       "stability.modes",
       "stability.growth_rates",

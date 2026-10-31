@@ -1,5 +1,10 @@
 import { create } from "@bufbuild/protobuf";
-import { anyPack, anyUnpack, timestampFromMs } from "@bufbuild/protobuf/wkt";
+import {
+  anyPack,
+  anyUnpack,
+  timestampFromMs,
+  type Any,
+} from "@bufbuild/protobuf/wkt";
 import {
   ChangeType,
   EntityKind,
@@ -15,7 +20,12 @@ import {
   type ValidationIssue,
 } from "../../gen/nebula/core/v1/project_pb";
 import { RegionSchema, RegionType } from "../../gen/nebula/core/v1/region_pb";
-import { ScenarioSchema } from "../../gen/nebula/core/v1/scenario_pb";
+import {
+  PlasmaTargetsSchema,
+  ScenarioSchema,
+} from "../../gen/nebula/core/v1/scenario_pb";
+import { EquilibriumScalarsSchema } from "../../gen/nebula/core/v1/output_pb";
+import type { Node } from "../../gen/nebula/core/v1/workflow_pb";
 import {
   AttemptSchema,
   DeterminismClass,
@@ -101,6 +111,8 @@ export function startEngine(
     },
     solvedScenario: (projectId, ref, runId) =>
       mintSolvedScenario(store, projectId, ref, runId),
+    scalars: (run, node, output, hash) =>
+      scalarsOf(store, run, node, output, hash),
   });
   engine.runs = runs;
   engine.outputs = outputs;
@@ -179,6 +191,51 @@ function fillFixtureRun(run: Run, workflow: Workflow): void {
       checkpointEpoch: run.steps.length,
     }),
   ];
+}
+
+/**
+ * Scalars an equilibrium step reports, from its scenario's plasma targets,
+ * varied a little by the output hash so different inputs differ.
+ */
+function scalarsOf(
+  store: MockStore,
+  run: Run,
+  node: Node,
+  output: string,
+  hash: string,
+): Any | undefined {
+  const step = stepOf(node);
+  const jitter = (parseInt(hash.slice(-4), 16) / 0xffff - 0.5) * 0.02;
+  if (step?.extensionId === "acme.demo.solver" && output === "scalars") {
+    const desc = mockSchema.getMessage("acme.demo.v1.DemoScalars");
+    return desc
+      ? anyPack(
+          desc,
+          create(desc, {
+            rippleMax: 0.004 * (1 + jitter),
+            fieldOnAxis: 5.3 * (1 + jitter),
+          } as never),
+        )
+      : undefined;
+  }
+  const ref = step?.bindings.find((b) => b.port === "scenario")?.ref;
+  const content = ref && store.resolve(run.projectId, ref);
+  const scenario = content && anyUnpack(content, ScenarioSchema);
+  const targets = scenario?.plasmaTargets
+    .map((any) => anyUnpack(any, PlasmaTargetsSchema))
+    .find(Boolean);
+  const current = targets?.plasmaCurrent || 1.5e7;
+  return anyPack(
+    EquilibriumScalarsSchema,
+    create(EquilibriumScalarsSchema, {
+      plasmaCurrent: current,
+      q95: 3.3 * (1.5e7 / current) * (1 + jitter),
+      betaPoloidal: (targets?.betaPoloidal || 0.64) * (1 + jitter / 10),
+      internalInductance: targets?.internalInductance || 0.8,
+      axisR: targets?.axisR || 6.3,
+      storedEnergy: 3.5e8 * (current / 1.5e7) ** 2,
+    }),
+  );
 }
 
 /** An equilibrium step emitted a solved scenario: a new version (D110). */

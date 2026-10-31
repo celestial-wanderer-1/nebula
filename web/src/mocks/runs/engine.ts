@@ -4,7 +4,7 @@ import {
   toBinary,
   type MessageInitShape,
 } from "@bufbuild/protobuf";
-import { AnySchema, timestampFromMs } from "@bufbuild/protobuf/wkt";
+import { AnySchema, timestampFromMs, type Any } from "@bufbuild/protobuf/wkt";
 import type { EntityRef } from "../../gen/nebula/core/v1/entity_pb";
 import {
   OutputKind,
@@ -76,6 +76,13 @@ export interface EngineContext {
   regionType: (projectId: string, ref: EntityRef) => RegionType | undefined;
   /** An equilibrium step committed: mint the solved scenario (D110). */
   solvedScenario: (projectId: string, ref: EntityRef, runId: string) => void;
+  /** Values of a scalars output, which travel inline. */
+  scalars: (
+    run: Run,
+    node: Node,
+    output: string,
+    key: string,
+  ) => Any | undefined;
 }
 
 interface CacheEntry {
@@ -825,6 +832,10 @@ export class RunEngine {
             contentHash: hash,
           },
         ],
+        scalars:
+          port.outputKind === OutputKind.SCALARS
+            ? this.context.scalars(run, node, port.name, hash)
+            : undefined,
         time: timeSeries
           ? {
               base: port.type?.timeBase || "slices",

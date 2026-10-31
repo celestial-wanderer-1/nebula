@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
-import { createProject, TOKEN, trackErrors } from "./helpers";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./test";
+import { createProject, TOKEN } from "./helpers";
 
 // docs/UI.md 6.4: a field calculation's inputs (geometry, region, scenario
 // with coil currents) can be authored end to end without the SDK.
@@ -35,7 +36,6 @@ const field = (page: Page, path: string) =>
 test("authors the inputs of a field calculation without the SDK", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   await createProject(page, "Tokamak starter", "E2E setup");
 
@@ -145,5 +145,4 @@ test("authors the inputs of a field calculation without the SDK", async ({
   await expect(
     page.getByRole("region", { name: "Validation" }).getByRole("status"),
   ).toHaveText("No issues: the server accepts this workflow.");
-  expect(errors).toEqual([]);
 });

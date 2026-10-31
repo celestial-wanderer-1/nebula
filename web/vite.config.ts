@@ -47,6 +47,28 @@ function proxyTo(target: string): ProxyOptions {
   };
 }
 
+// The production Content Security Policy (D117), applied to mock previews
+// too, so a library that needs `eval` or inline styles fails in e2e early.
+// Style elements need the page's nonce (index.html); Plotly's one empty
+// <style>, filled through the CSSOM, is admitted by the hash of "". The
+// preview's nonce is the placeholder: a real server sends a fresh one.
+const EMPTY_STYLE_HASH =
+  "'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='";
+const CSP = [
+  "default-src 'none'",
+  "script-src 'self'",
+  `style-src 'self' 'nonce-NEBULA_CSP_NONCE' ${EMPTY_STYLE_HASH}`,
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self' ws: wss:",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+].join("; ");
+
 export default defineConfig(({ mode }) => {
   // `pnpm dev` uses the mock unless NEBULA_SERVER points at `nebula serve`
   // (docs/UI.md Section 7); `build:mock` bundles the mock for Playwright.
@@ -60,6 +82,12 @@ export default defineConfig(({ mode }) => {
     define: {
       __NEBULA_MOCK__: JSON.stringify(useMock),
       __NEBULA_BUILD__: JSON.stringify(`${pkg.version}+${mode}`),
+    },
+    preview: {
+      headers: {
+        "Content-Security-Policy": CSP,
+        "X-Content-Type-Options": "nosniff",
+      },
     },
     server: target
       ? {

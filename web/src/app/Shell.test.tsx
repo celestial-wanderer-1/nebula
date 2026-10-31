@@ -47,13 +47,13 @@ describe("Shell", () => {
   });
 
   it("shows project navigation and phase placeholders inside a project", async () => {
-    renderRoute("/p/p-baseline/results");
+    renderRoute("/p/p-baseline/studies");
     const nav = screen.getByRole("navigation", { name: "Project" });
-    expect(within(nav).getByRole("link", { name: "Results" })).toHaveClass(
+    expect(within(nav).getByRole("link", { name: "Studies" })).toHaveClass(
       "active",
     );
-    expect(screen.getByRole("heading", { name: "Results" })).toBeVisible();
-    expect(screen.getByText("This area arrives in phase P5.")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Studies" })).toBeVisible();
+    expect(screen.getByText("This area arrives in phase P6.")).toBeVisible();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Switch project" }),

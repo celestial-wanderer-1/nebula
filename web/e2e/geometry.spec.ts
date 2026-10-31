@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { expect, test, type Page } from "@playwright/test";
-import { createProject, TOKEN, trackErrors } from "./helpers";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./test";
+import { createProject, TOKEN } from "./helpers";
 
 // EntityKind.COMPONENT; e2e tests do not import the generated code.
 const COMPONENT = 2;
@@ -55,7 +56,6 @@ async function selectPf1(page: Page) {
 }
 
 test("renders a new Tokamak project's geometry in 3D", async ({ page }) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   await createProject(page, "Tokamak starter", "E2E geometry");
   await openGeometry(page, "Reference assembly");
@@ -68,13 +68,11 @@ test("renders a new Tokamak project's geometry in 3D", async ({ page }) => {
     );
   }
   await expect(page.getByRole("alert")).toHaveCount(0);
-  expect(errors).toEqual([]);
 });
 
 test("replaces a mesh with the build of the edited revision", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await openBaseline(page);
   await expectCanvas(page);
   const radius = await selectPf1(page);
@@ -87,13 +85,11 @@ test("replaces a mesh with the build of the edited revision", async ({
   await expect(
     properties(page).getByRole("status", { name: "Save status" }),
   ).toHaveText("Saved");
-  expect(errors).toEqual([]);
 });
 
 test("asks what to keep when another client edits the component", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await openBaseline(page);
   const radius = await selectPf1(page);
   // The other client saves before this edit's debounced PATCH goes out.
@@ -114,11 +110,9 @@ test("asks what to keep when another client edits the component", async ({
   await expect(
     properties(page).getByRole("status", { name: "Save status" }),
   ).toHaveText("Saved");
-  expect(errors).toEqual([]);
 });
 
 test("exports the geometry draft as STEP", async ({ page }) => {
-  const errors = trackErrors(page);
   await openBaseline(page);
   // An edit holds the export back until it is saved, then is in the file.
   await page
@@ -135,13 +129,11 @@ test("exports the geometry draft as STEP", async ({ page }) => {
   expect(file.suggestedFilename()).toBe("Baseline-assembly-E2E.step");
   const body = await readFile(await file.path(), "utf8");
   expect(body.startsWith("ISO-10303-21")).toBe(true);
-  expect(errors).toEqual([]);
 });
 
 test("imports a global library component and follows its source link", async ({
   page,
 }) => {
-  const errors = trackErrors(page);
   await page.goto(`/p/p-baseline/libraries${TOKEN}`);
   await page.getByRole("tab", { name: "Global components" }).click();
   await page.getByRole("button", { name: "Import PF coil (generic)" }).click();
@@ -164,11 +156,9 @@ test("imports a global library component and follows its source link", async ({
     page.getByRole("button", { name: "Import into project" }),
   ).toBeVisible();
   await expect(page.getByText("Circular winding pack")).toBeVisible();
-  expect(errors).toEqual([]);
 });
 
 test("toggles symmetry replicas of a stellarator", async ({ page }) => {
-  const errors = trackErrors(page);
   await page.goto(`/${TOKEN}`);
   await createProject(page, "Stellarator starter", "E2E stellarator");
   await openGeometry(page, "Reference assembly");
@@ -191,5 +181,4 @@ test("toggles symmetry replicas of a stellarator", async ({ page }) => {
   await replicas.check();
   await expect(viewport(page)).toHaveAttribute("data-replicas", drawn);
   await expectCanvas(page);
-  expect(errors).toEqual([]);
 });

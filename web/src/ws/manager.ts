@@ -37,6 +37,8 @@ interface Channel {
   /** Set once the channel has been open, so later opens are reconnects. */
   wasOpen: boolean;
   timer?: unknown;
+  /** Frames sent while connecting, flushed on open. */
+  outbox: string[];
 }
 
 /**
@@ -90,7 +92,13 @@ export class WsManager {
     };
     let channel = this.channels.get(path);
     if (!channel) {
-      channel = { path, subscribers: new Set(), attempt: 0, wasOpen: false };
+      channel = {
+        path,
+        subscribers: new Set(),
+        attempt: 0,
+        wasOpen: false,
+        outbox: [],
+      };
       this.channels.set(path, channel);
       this.connect(channel);
     }
@@ -104,6 +112,22 @@ export class WsManager {
         this.closeChannel(current);
       }
     };
+  }
+
+  /**
+   * Sends a frame on a subscribed channel, such as a view request (docs/UI.md
+   * Section 4.3). Frames sent while connecting go out once it opens; a
+   * channel nobody subscribes to has no connection, so it returns false.
+   */
+  send(path: string, data: string): boolean {
+    const channel = this.channels.get(path);
+    if (!channel) return false;
+    if (channel.socket?.readyState === WebSocket.OPEN) {
+      channel.socket.send(data);
+    } else {
+      channel.outbox.push(data);
+    }
+    return true;
   }
 
   /** Whether a channel currently has an open connection. */
@@ -137,6 +161,7 @@ export class WsManager {
       const reconnected = channel.wasOpen || channel.attempt > 0;
       channel.attempt = 0;
       channel.wasOpen = true;
+      for (const frame of channel.outbox.splice(0)) socket.send(frame);
       if (reconnected) {
         for (const subscriber of channel.subscribers) {
           subscriber.onReconnect?.();

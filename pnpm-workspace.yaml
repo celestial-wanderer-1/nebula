@@ -5,3 +5,8 @@ onlyBuiltDependencies:
   - esbuild
   - msw
   - "@bufbuild/buf"
+
+# One copy of the WebXR types: three.js and vtk.js each pull a version, and
+# two copies collide in the type checker.
+overrides:
+  "@types/webxr": 0.5.24

@@ -1,5 +1,5 @@
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { anyPack } from "@bufbuild/protobuf/wkt";
+import { anyPack, type Any } from "@bufbuild/protobuf/wkt";
 import { ConductorNetworkSchema } from "../gen/nebula/core/v1/conductor_network_pb";
 import {
   InputDatasetSchema,
@@ -7,10 +7,12 @@ import {
 } from "../gen/nebula/core/v1/dataset_pb";
 import { EntityKind } from "../gen/nebula/core/v1/entity_pb";
 import {
+  EquilibriumScalarsSchema,
+  OutputKind,
   RunOutputSchema,
   type RunOutput,
 } from "../gen/nebula/core/v1/output_pb";
-import { RegionSchema } from "../gen/nebula/core/v1/region_pb";
+import { RegionSchema, RegionType } from "../gen/nebula/core/v1/region_pb";
 import {
   DeterminismMode,
   ProvenanceTag,
@@ -526,6 +528,20 @@ export function baselineSetup(): EntityRecord[] {
       },
     },
   });
+  const box = regionFixture({
+    geometry: geoV2,
+    shape: {
+      case: "boxGrid",
+      value: {
+        min: { x: 3.5, y: -2, z: -5 },
+        max: { x: 9, y: 2, z: 5 },
+        nx: 24,
+        ny: 16,
+        nz: 32,
+      },
+    },
+  });
+  const survey = pack(WorkflowSchema, surveyWorkflow());
   const flattop = (pf: number, feed = false) =>
     scenarioFixture({
       geometry: feed ? entityRef(EntityKind.GEOMETRY, "geo-main") : geoV2,
@@ -604,6 +620,24 @@ export function baselineSetup(): EntityRecord[] {
       content: plane,
       versions: [version("sha256:reg-v1", "2026-09-10T12:00:00Z", "r-03", 2)],
       versionContents: { "sha256:reg-v1": plane },
+    }),
+    entity(p, {
+      kind: EntityKind.REGION,
+      id: "reg-box",
+      name: "Plasma box",
+      content: box,
+      versions: [version("sha256:box-v1", "2026-10-25T09:00:00Z", "r-14", 1)],
+      versionContents: { "sha256:box-v1": box },
+    }),
+    entity(p, {
+      kind: EntityKind.WORKFLOW,
+      id: "wf-survey",
+      name: "Survey",
+      content: survey,
+      versions: [
+        version("sha256:survey-v1", "2026-10-25T09:00:00Z", "r-14", 1),
+      ],
+      versionContents: { "sha256:survey-v1": survey },
     }),
     entity(p, {
       kind: EntityKind.REGION,
@@ -697,6 +731,16 @@ export function runFixtures(): Run[] {
       submittedAt: at("2026-10-30T07:40:00Z"),
     }),
     run({
+      id: "r-14",
+      projectId: "p-baseline",
+      name: "Survey #14",
+      workflowId: "wf-survey",
+      workflowVersionHash: "sha256:survey-v1",
+      state: RunState.COMPLETED,
+      submittedAt: at("2026-10-25T09:00:00Z"),
+      finishedAt: at("2026-10-25T09:30:00Z"),
+    }),
+    run({
       id: "r-11",
       projectId: "p-baseline",
       name: "Field to stability #11",
@@ -731,13 +775,23 @@ export function runFixtures(): Run[] {
 }
 
 /** A committed output with one HDF5 dataset (A§5.2). */
+export interface OutputExtra {
+  kind?: OutputKind;
+  regionType?: RegionType;
+  regionId?: string;
+  scalars?: Any;
+  /** Slices of a time-series output, in seconds. */
+  times?: number[];
+}
+
+/** A committed output with one HDF5 dataset (A§5.2). */
 export function committedOutput(
   runId: string,
   nodeId: string,
   name: string,
   subContract: string,
   iso: string,
-  timeSeries = false,
+  extra: OutputExtra = {},
 ): RunOutput {
   const contentHash = `sha256:${runId}-${nodeId}-${name}`;
   return create(RunOutputSchema, {
@@ -746,8 +800,14 @@ export function committedOutput(
     name,
     subContract,
     contentHash,
-    timeSeries,
+    timeSeries: Boolean(extra.times),
     committedAt: at(iso),
+    kind: extra.kind,
+    regionType: extra.regionType,
+    regionId: extra.regionId,
+    scalars: extra.scalars,
+    attempt: 1,
+    time: extra.times ? { base: "scenario", times: extra.times } : undefined,
     datasets: [
       {
         owner: runId,
@@ -759,32 +819,190 @@ export function committedOutput(
   });
 }
 
+/** Equilibrium scalars (A§13.7 comparison uses them). */
+export function equilibriumScalars(
+  init: MessageInitShape<typeof EquilibriumScalarsSchema>,
+): Any {
+  return anyPack(
+    EquilibriumScalarsSchema,
+    create(EquilibriumScalarsSchema, init),
+  );
+}
+
+const TRANSPORT_TIMES = Array.from({ length: 10 }, (_, i) => i * 0.5);
+
+/** The committed outputs of the completed fixture Runs. */
 export function outputFixtures(): RunOutput[] {
   const out = committedOutput;
-  return [
-    out("r-03", "field", "field", SUB.fieldSampled, "2026-09-10T12:10:00Z"),
-    out("r-03", "field", "operator", SUB.fieldOperator, "2026-09-10T12:10:00Z"),
-    out("r-03", "t1", "equilibrium", SUB.axisym, "2026-09-10T12:25:00Z"),
-    out("r-03", "t1", "lcfs", SUB.boundary, "2026-09-10T12:25:00Z"),
-    out(
-      "r-03",
-      "stability",
-      "growth_rates",
-      SUB.spectrum,
-      "2026-09-10T12:35:00Z",
-    ),
-    out("r-11", "field", "field", SUB.fieldSampled, "2026-10-20T12:12:00Z"),
-    out("r-11", "field", "operator", SUB.fieldOperator, "2026-10-20T12:12:00Z"),
-    out("r-11", "t1", "equilibrium", SUB.axisym, "2026-10-20T12:30:00Z"),
-    out("r-11", "t1", "lcfs", SUB.boundary, "2026-10-20T12:30:00Z"),
-    out(
-      "r-11",
-      "stability",
-      "growth_rates",
-      SUB.spectrum,
-      "2026-10-20T12:41:00Z",
-    ),
+  const chain = (
+    runId: string,
+    day: string,
+    scalars: MessageInitShape<typeof EquilibriumScalarsSchema>,
+  ) => [
+    out(runId, "field", "field", SUB.fieldSampled, `${day}T12:10:00Z`, {
+      kind: OutputKind.REGION_FIELD,
+      regionType: RegionType.PLANE,
+      regionId: "reg-midplane",
+    }),
+    out(runId, "field", "operator", SUB.fieldOperator, `${day}T12:10:00Z`, {
+      kind: OutputKind.FIELD_OPERATOR,
+    }),
+    out(runId, "t1", "equilibrium", SUB.axisym, `${day}T12:25:00Z`, {
+      kind: OutputKind.FLUX_SURFACES,
+    }),
+    out(runId, "t1", "lcfs", SUB.boundary, `${day}T12:25:00Z`, {
+      kind: OutputKind.SURFACE,
+    }),
+    out(runId, "t1", "scalars", SUB.scalars, `${day}T12:25:00Z`, {
+      kind: OutputKind.SCALARS,
+      scalars: equilibriumScalars(scalars),
+    }),
+    out(runId, "stability", "growth_rates", SUB.spectrum, `${day}T12:35:00Z`, {
+      kind: OutputKind.SPECTRUM,
+    }),
   ];
+  return [
+    // r-03 and r-11 differ beyond tolerance in q95 only (D43, P6).
+    ...chain("r-03", "2026-09-10", {
+      plasmaCurrent: 1.5e7,
+      q95: 3.02,
+      betaPoloidal: 0.6402,
+      internalInductance: 0.8001,
+      axisR: 6.312,
+      storedEnergy: 3.512e8,
+    }),
+    ...chain("r-11", "2026-10-20", {
+      plasmaCurrent: 1.5e7,
+      q95: 3.31,
+      betaPoloidal: 0.6403,
+      internalInductance: 0.8,
+      axisR: 6.3121,
+      storedEnergy: 3.5121e8,
+    }),
+    ...surveyOutputs(),
+  ];
+}
+
+/** Outputs of r-14, a survey covering every viewer of the catalogue. */
+function surveyOutputs(): RunOutput[] {
+  const out = (
+    nodeId: string,
+    name: string,
+    subContract: string,
+    extra: OutputExtra,
+  ) =>
+    committedOutput(
+      "r-14",
+      nodeId,
+      name,
+      subContract,
+      "2026-10-25T09:30:00Z",
+      extra,
+    );
+  return [
+    out("field", "field", SUB.fieldSampled, {
+      kind: OutputKind.REGION_FIELD,
+      regionType: RegionType.BOX_GRID,
+      regionId: "reg-box",
+    }),
+    out("field", "operator", SUB.fieldOperator, {
+      kind: OutputKind.FIELD_OPERATOR,
+    }),
+    out("poincare", "poincare", SUB.derived, { kind: OutputKind.FIELD_LINES }),
+    out("t1", "equilibrium", SUB.axisym, { kind: OutputKind.FLUX_SURFACES }),
+    out("t1", "scalars", SUB.scalars, {
+      kind: OutputKind.SCALARS,
+      scalars: equilibriumScalars({
+        plasmaCurrent: 1.5e7,
+        q95: 3.3,
+        betaPoloidal: 0.64,
+        internalInductance: 0.8,
+        axisR: 6.31,
+        storedEnergy: 3.51e8,
+      }),
+    }),
+    out("stability", "modes", SUB.modes, { kind: OutputKind.EIGENMODE }),
+    out("stability", "growth_rates", SUB.spectrum, {
+      kind: OutputKind.SPECTRUM,
+    }),
+    out("transport", "profiles", SUB.profiles, {
+      kind: OutputKind.PROFILE,
+      times: TRANSPORT_TIMES,
+    }),
+    out("transport", "equilibria", SUB.axisym, {
+      kind: OutputKind.FLUX_SURFACES,
+      times: TRANSPORT_TIMES,
+    }),
+  ];
+}
+
+/** Geometry → field (box grid) → Poincaré; T1 → flux → global; transport. */
+export function surveyWorkflow(): WorkflowInit {
+  const pinned = (id: string, hash: string) => ({
+    id,
+    state: { pinned: hash } as const,
+  });
+  const geometry = pinned("geo-main", "sha256:geo-v2");
+  const scenario = pinned("scn-flattop", "sha256:scn-v2");
+  return {
+    nodes: [
+      step(
+        "field",
+        "solver",
+        "nebula.field.biot_savart",
+        "Biot–Savart field",
+        0,
+        80,
+        fieldBindings({
+          geometry,
+          scenario,
+          region: pinned("reg-box", "sha256:box-v1"),
+        }),
+      ),
+      step("poincare", "postOp", "nebula.postop.poincare", "Poincaré", 300, 0),
+      step(
+        "t1",
+        "solver",
+        "nebula.equilibrium.t1",
+        "T1 equilibrium",
+        300,
+        160,
+        scenarioBinding({ scenario }),
+      ),
+      step(
+        "flux",
+        "adapter",
+        "nebula.adapter.flux_coordinates",
+        "Flux coordinates",
+        600,
+        160,
+      ),
+      step(
+        "stability",
+        "solver",
+        "nebula.stability.global",
+        "Global stability",
+        900,
+        160,
+      ),
+      step(
+        "transport",
+        "solver",
+        "nebula.evolution.transport",
+        "Transport evolution",
+        600,
+        320,
+        scenarioBinding({ scenario }),
+      ),
+    ],
+    edges: [
+      edge("e-1", "field", "field", "poincare", "field"),
+      edge("e-2", "field", "operator", "t1", "field"),
+      edge("e-3", "t1", "equilibrium", "flux", "equilibrium"),
+      edge("e-4", "flux", "equilibrium", "stability", "equilibrium"),
+      edge("e-5", "t1", "equilibrium", "transport", "equilibrium"),
+    ],
+  };
 }
 
 export interface InputRecord {

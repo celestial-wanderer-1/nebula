@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
-import { mock, RUN_STATE, runIdOf, TOKEN, trackErrors } from "./helpers";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./test";
+import { mock, RUN_STATE, runIdOf, TOKEN } from "./helpers";
 
 // A§3.7: typed failures, resume from a checkpoint for transient reasons,
 // re-run with an edited workflow otherwise; pause and resume. The mock
@@ -32,7 +33,7 @@ async function submit(page: Page, script: string) {
   ).toContainText("No step is cached.");
   await dialog.getByRole("button", { name: "Submit run" }).click();
   await expect(badge(page)).toHaveText("Queued");
-  return runIdOf(page);
+  return await runIdOf(page);
 }
 
 for (const [script, reason] of [
@@ -40,7 +41,6 @@ for (const [script, reason] of [
   ["supervisor_lost", "supervisor_lost"],
 ] as const) {
   test(`resumes after ${reason} from the last checkpoint`, async ({ page }) => {
-    const errors = trackErrors(page);
     const id = await submit(page, script);
     await mock(page, "runUntil", id, RUN_STATE.FAILED);
     await expect(badge(page)).toHaveText("Failed");
@@ -53,12 +53,10 @@ for (const [script, reason] of [
     await expect(badge(page)).toHaveText("Completed");
     const attempts = page.getByRole("region", { name: "Attempts" });
     await expect(attempts.getByRole("row")).toHaveCount(3);
-    expect(errors).toEqual([]);
   });
 }
 
 test("re-runs a diverged run with an edited workflow", async ({ page }) => {
-  const errors = trackErrors(page);
   const id = await submit(page, "diverged");
   await mock(page, "runUntil", id, RUN_STATE.FAILED);
   await expect(badge(page)).toHaveText("Failed");
@@ -89,14 +87,12 @@ test("re-runs a diverged run with an edited workflow", async ({ page }) => {
   await expect(page.getByRole("group", { name: "Run state" })).toContainText(
     `Re-run of ${id}`,
   );
-  const second = runIdOf(page);
+  const second = await runIdOf(page);
   await mock(page, "runUntil", second, RUN_STATE.COMPLETED);
   await expect(badge(page)).toHaveText("Completed");
-  expect(errors).toEqual([]);
 });
 
 test("pauses a running run and resumes it", async ({ page }) => {
-  const errors = trackErrors(page);
   const id = await submit(page, "success");
   await mock(page, "runUntil", id, RUN_STATE.RUNNING);
   await expect(badge(page)).toHaveText("Running");
@@ -109,5 +105,4 @@ test("pauses a running run and resumes it", async ({ page }) => {
   await act(page, "Resume");
   await mock(page, "runUntil", id, RUN_STATE.COMPLETED);
   await expect(badge(page)).toHaveText("Completed");
-  expect(errors).toEqual([]);
 });

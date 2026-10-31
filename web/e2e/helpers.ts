@@ -3,13 +3,6 @@ import { expect, type Page } from "@playwright/test";
 // The launch URL `nebula serve` would print; the mock accepts this token.
 export const TOKEN = "#token=mock-token";
 
-/** Collects uncaught page errors; every test expects none. */
-export function trackErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  return errors;
-}
-
 export async function createProject(
   page: Page,
   template: string,
@@ -56,6 +49,8 @@ export async function mock<A extends unknown[]>(
   );
 }
 
-/** The ID of the Run whose page is open. */
-export const runIdOf = (page: Page) =>
-  page.url().split("/").pop()!.split("#")[0]!;
+/** The ID of the Run whose page opens after a submission. */
+export async function runIdOf(page: Page): Promise<string> {
+  await page.waitForURL(/\/runs\/r-\d+$/);
+  return page.url().split("/").pop()!;
+}

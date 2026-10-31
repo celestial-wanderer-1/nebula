@@ -142,13 +142,14 @@ describe("setup handlers", () => {
     const runs = await json(await call("/projects/p-baseline/runs"));
     expect((runs.runs as { id: string }[]).map((r) => r.id)).toEqual([
       "r-12",
+      "r-14",
       "r-11",
       "r-03",
     ]);
     const outputs = await json(
       await call("/projects/p-baseline/runs/r-11/outputs"),
     );
-    expect((outputs.outputs as unknown[]).length).toBe(5);
+    expect((outputs.outputs as unknown[]).length).toBe(6);
     expect((await call("/projects/p-baseline/runs/nope/outputs")).status).toBe(
       404,
     );

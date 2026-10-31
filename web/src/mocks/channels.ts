@@ -1,9 +1,13 @@
-import { create, toJsonString } from "@bufbuild/protobuf";
+import { create, fromJsonString, toJsonString } from "@bufbuild/protobuf";
 import { timestampNow } from "@bufbuild/protobuf/wkt";
 import { EntityChangeSchema } from "../gen/nebula/core/v1/entity_pb";
 import { QueueEventSchema } from "../gen/nebula/core/v1/queue_pb";
 import { RunEventSchema } from "../gen/nebula/core/v1/run_pb";
 import { TelemetryEventSchema } from "../gen/nebula/core/v1/telemetry_pb";
+import {
+  ViewReplySchema,
+  ViewRequestSchema,
+} from "../gen/nebula/core/v1/view_pb";
 import { WS_CLOSE_UNAUTHORIZED, WS_TOKEN_PREFIX } from "../ws/manager";
 import { mockSchema } from "./fixtures";
 import { store } from "./state";
@@ -98,6 +102,28 @@ export const channelRoutes: ChannelRoute[] = [
       );
       for (const event of store.engine.recent(runId)) send(event);
       client.onClose(store.engine.onRunEvent(runId, send));
+    },
+  },
+  {
+    // Request and reply: each ViewRequest gets a ViewReply with its ID.
+    pattern: /\/ws\/views$/,
+    connect(client) {
+      let open = true;
+      client.onClose(() => (open = false));
+      client.onMessage((data) => {
+        let request;
+        try {
+          request = fromJsonString(ViewRequestSchema, data, json);
+        } catch {
+          return;
+        }
+        const { reply, delayMs } = store.views.handle(request);
+        const send = () => {
+          if (open) client.send(toJsonString(ViewReplySchema, reply, json));
+        };
+        if (delayMs) setTimeout(send, delayMs);
+        else send();
+      });
     },
   },
   {
