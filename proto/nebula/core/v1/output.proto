@@ -59,17 +59,34 @@ message RunOutput {
   google.protobuf.Any scalars = 16;
 }
 
-// Scalars of an equilibrium (Equilibrium.Scalars).
+// Scalars of an equilibrium (Equilibrium.Scalars), with the tolerances a
+// comparison flags differences against (D43, D104).
 message EquilibriumScalars {
-  double plasma_current = 1 [(quantity) = {unit: "A"}];
-  double q95 = 2 [(ui) = {label: "q95"}];
-  double beta_poloidal = 3 [(ui) = {label: "β poloidal"}];
-  double internal_inductance = 4 [(ui) = {label: "Internal inductance (li)"}];
+  double plasma_current = 1 [
+    (quantity) = {unit: "A"},
+    (tolerance) = {rel: 1e-6}
+  ];
+  double q95 = 2 [
+    (ui) = {label: "q95"},
+    (tolerance) = {rel: 0.02}
+  ];
+  double beta_poloidal = 3 [
+    (ui) = {label: "β poloidal"},
+    (tolerance) = {rel: 1e-3}
+  ];
+  double internal_inductance = 4 [
+    (ui) = {label: "Internal inductance (li)"},
+    (tolerance) = {rel: 1e-3}
+  ];
   double axis_r = 5 [
     (quantity) = {unit: "m"},
-    (ui) = {label: "Magnetic axis R"}
+    (ui) = {label: "Magnetic axis R"},
+    (tolerance) = {abs: 1e-3}
   ];
-  double stored_energy = 6 [(quantity) = {unit: "J"}];
+  double stored_energy = 6 [
+    (quantity) = {unit: "J"},
+    (tolerance) = {rel: 1e-3}
+  ];
 }
 
 message ListRunOutputsResponse {

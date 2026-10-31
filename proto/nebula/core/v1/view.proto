@@ -4,6 +4,7 @@ package nebula.core.v1;
 
 import "google/protobuf/struct.proto";
 import "nebula/core/v1/component.proto";
+import "nebula/core/v1/entity.proto";
 import "nebula/core/v1/errors.proto";
 import "nebula/core/v1/options.proto";
 import "nebula/core/v1/output.proto";
@@ -72,6 +73,10 @@ message ViewRequest {
   string post_op = 4;
   ViewerKind viewer = 5;
   ViewParams params = 6;
+  // A difference view (D104): `output` minus `reference`, both resampled on
+  // `region` by a GPU job.
+  OutputRef reference = 7;
+  EntityRef region = 8;
 }
 
 // A Plotly figure: {"data": [...], "layout": {...}}.

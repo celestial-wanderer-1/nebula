@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/timestamp.proto";
+import "nebula/core/v1/run.proto";
+
+// Evenly spaced values from min to max inclusive.
+message RangeValues {
+  double min = 1;
+  double max = 2;
+  uint32 count = 3;
+}
+
+message PointList {
+  repeated double values = 1;
+}
+
+// A design variable of a scan (D81, D109).
+message StudyVariable {
+  // Field path the override applies to, for example
+  // "scenarios/scn-1/currents/ckt-pf/current" or
+  // "nodes/t1/config/tolerance".
+  string path = 1;
+  string label = 2;
+  string unit = 3;
+  oneof values {
+    RangeValues range = 4;
+    PointList points = 5;
+  }
+}
+
+enum StudyState {
+  STUDY_STATE_UNSPECIFIED = 0;
+  STUDY_STATE_DRAFT = 1;
+  STUDY_STATE_RUNNING = 2;
+  STUDY_STATE_STOPPED = 3;
+  STUDY_STATE_COMPLETED = 4;
+}
+
+// One point of a scan: an override vector and the Run that evaluates it
+// (D109).
+message StudyPoint {
+  uint32 index = 1;
+  ParameterOverride overrides = 2;
+  // Empty until the point's Run is created.
+  string run_id = 3;
+  RunState state = 4;
+  // Key metrics of the point's Run, by name.
+  map<string, double> metrics = 5;
+}
+
+// A parameter-scan Study (A§12.4): one Run per point of the cartesian
+// product of its variables, up to `concurrency` at a time (D142).
+message Study {
+  string id = 1;
+  string name = 2;
+  string workflow_id = 3;
+  // The pinned base Workflow version the overrides apply to (D109).
+  string workflow_version_hash = 4;
+  repeated StudyVariable variables = 5;
+  // Concurrent point Runs; 0 for the default, the installed GPU count.
+  uint32 concurrency = 6;
+  uint32 gpus_per_run = 7;
+  DeterminismMode mode = 8;
+  StudyState state = 9;
+  repeated StudyPoint points = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+// Body of POST /projects/{p}/studies.
+message CreateStudyRequest {
+  string name = 1;
+  string workflow_id = 2;
+  string workflow_version_hash = 3;
+  repeated StudyVariable variables = 4;
+  uint32 concurrency = 5;
+  uint32 gpus_per_run = 6;
+  DeterminismMode mode = 7;
+}
+
+message ListStudiesResponse {
+  repeated Study studies = 1;
+}

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/timestamp.proto";
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+import "nebula/core/v1/output.proto";
+import "nebula/core/v1/region.proto";
+import "nebula/core/v1/view.proto";
+
+// Body of POST /projects/{p}/comparisons: Runs of one project compared on
+// a shared Region (D51, D104).
+message CreateComparisonRequest {
+  repeated string run_ids = 1;
+  EntityRef region = 2;
+}
+
+message ScalarCell {
+  string run_id = 1;
+  // Unset when the Run has no such quantity.
+  optional double value = 2;
+}
+
+// One scalar quantity across the compared Runs.
+message ScalarRow {
+  // Output key, "<node>/<output>".
+  string output = 1;
+  // Field name in the scalars message.
+  string quantity = 2;
+  string label = 3;
+  string unit = 4;
+  repeated ScalarCell cells = 5;
+  // The quantity's declared tolerance (D43).
+  Tolerance tolerance = 6;
+  // Some pair of values differs beyond the tolerance (D104).
+  bool out_of_tolerance = 7;
+  double max_abs_diff = 8;
+  double max_rel_diff = 9;
+}
+
+// An output the compared Runs share, for overlaid profiles, difference
+// fields and linked views.
+message ComparedOutput {
+  // "<node>/<output>".
+  string key = 1;
+  OutputKind kind = 2;
+  string sub_contract = 3;
+  // One per Run, in the comparison's Run order.
+  repeated OutputRef refs = 4;
+  RegionType region_type = 5;
+}
+
+message Comparison {
+  string id = 1;
+  repeated string run_ids = 2;
+  EntityRef region = 3;
+  repeated ScalarRow scalars = 4;
+  repeated ComparedOutput outputs = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ListComparisonsResponse {
+  repeated Comparison comparisons = 1;
+}

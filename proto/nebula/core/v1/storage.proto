@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/entity.proto";
+
+// Storage classes of a project (A§4.7).
+enum StorageClass {
+  STORAGE_CLASS_UNSPECIFIED = 0;
+  // Committed run outputs: deleted only by the user (D79).
+  STORAGE_CLASS_PRIMARY = 1;
+  STORAGE_CLASS_MESHES = 2;
+  STORAGE_CLASS_DISCRETIZED = 3;
+  STORAGE_CLASS_FLUX_COORDINATES = 4;
+  STORAGE_CLASS_VIEW_PAYLOADS = 5;
+  STORAGE_CLASS_CHECKPOINTS = 6;
+  STORAGE_CLASS_LOGS = 7;
+}
+
+message StorageCategory {
+  StorageClass storage_class = 1;
+  uint64 bytes = 2;
+  // Derived artifacts, and checkpoints of finished Runs, can be evicted.
+  bool evictable = 3;
+}
+
+// The primary results of one Run.
+message PrimaryResult {
+  string run_id = 1;
+  string run_name = 2;
+  uint64 bytes = 3;
+  uint32 outputs = 4;
+}
+
+// Response of GET /projects/{p}/storage (D79).
+message StorageUsage {
+  uint64 cap_bytes = 1;
+  uint64 used_bytes = 2;
+  repeated StorageCategory categories = 3;
+  repeated PrimaryResult results = 4;
+}
+
+// Body of POST /projects/{p}/storage/evict.
+message EvictRequest {
+  repeated StorageClass classes = 1;
+}
+
+message EvictResponse {
+  uint64 freed_bytes = 1;
+  StorageUsage usage = 2;
+}
+
+// Something that refers to a Run's outputs, such as a stored-output node.
+message Dependent {
+  EntityKind kind = 1;
+  string id = 2;
+  string name = 3;
+  // Where the reference is, for example "nodes/stored".
+  string path = 4;
+  // Set when the reference is in a version rather than the draft.
+  string version_hash = 5;
+}
+
+// Response of GET /projects/{p}/storage/dependents?run={r} (D141).
+message DependentsResponse {
+  repeated Dependent dependents = 1;
+}
+
+// Body of POST /projects/{p}/storage/delete. With dependents, the request
+// must acknowledge them, or it fails with 409 `in_use` (D79, D141).
+message DeleteResultsRequest {
+  repeated string run_ids = 1;
+  bool acknowledge_dependents = 2;
+}
+
+message DeleteResultsResponse {
+  repeated string deleted = 1;
+  StorageUsage usage = 2;
+}

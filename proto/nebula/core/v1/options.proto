@@ -58,12 +58,21 @@ enum IdRef {
   ID_REF_SUPPLY = 4;
 }
 
+// Declared tolerance of an output quantity (D43, A§15.2): two results agree
+// when they differ by at most `abs`, or by at most `rel` of the larger
+// magnitude.
+message Tolerance {
+  optional double abs = 1;
+  optional double rel = 2;
+}
+
 // Core options occupy 50000-50999 on every options message. A field carrying
 // a number in this range that the UI build does not know comes from a newer
 // core and is rendered read-only (docs/UI.md Section 5).
 extend google.protobuf.FieldOptions {
   Quantity quantity = 50001;
   UiHint ui = 50002;
+  Tolerance tolerance = 50003;
 }
 
 // Traits of a component shape message (A§10.1). Circuits accept only

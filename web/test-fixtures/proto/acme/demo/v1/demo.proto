@@ -178,8 +178,15 @@ message DemoPostOpConfig {
   ];
 }
 
-// Scalars output of acme.demo.solver.
+// Scalars output of acme.demo.solver, with plugin-declared tolerances
+// (D43, D54).
 message DemoScalars {
-  double ripple_max = 1 [(nebula.core.v1.quantity) = {min: 0}];
-  double field_on_axis = 2 [(nebula.core.v1.quantity) = {unit: "T"}];
+  double ripple_max = 1 [
+    (nebula.core.v1.quantity) = {min: 0},
+    (nebula.core.v1.tolerance) = {abs: 1e-4}
+  ];
+  double field_on_axis = 2 [
+    (nebula.core.v1.quantity) = {unit: "T"},
+    (nebula.core.v1.tolerance) = {rel: 1e-3}
+  ];
 }
