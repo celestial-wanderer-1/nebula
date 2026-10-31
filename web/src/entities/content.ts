@@ -16,6 +16,24 @@ import {
   type Geometry,
 } from "../gen/nebula/core/v1/geometry_pb";
 
+/**
+ * Draft content of one message type; a new message with its defaults when
+ * absent or of another type (D87).
+ */
+export function unpackAs<Desc extends DescMessage>(
+  desc: Desc,
+  content: Any | undefined,
+): MessageShape<Desc> {
+  return (content && anyUnpack(content, desc)) ?? newMessage(desc);
+}
+
+export function packAs<Desc extends DescMessage>(
+  desc: Desc,
+  message: MessageShape<Desc>,
+): Any {
+  return anyPack(desc, message);
+}
+
 /** "type.googleapis.com/nebula.core.v1.Foo" -> "nebula.core.v1.Foo". */
 export function typeNameOf(any: Any | undefined): string {
   const url = any?.typeUrl ?? "";
@@ -101,7 +119,12 @@ export function packGeometry(geometry: Geometry): Any {
   return anyPack(GeometrySchema, geometry);
 }
 
+/** A stable ID with a prefix, generated once and stored in content. */
+export function newStableId(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+}
+
 /** A stable circuit ID, generated once and stored in content (D114). */
 export function newCircuitId(): string {
-  return `ckt-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+  return newStableId("ckt");
 }

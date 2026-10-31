@@ -4,7 +4,7 @@ import {
   type MessageInitShape,
 } from "@bufbuild/protobuf";
 import { base64Decode } from "@bufbuild/protobuf/wire";
-import { anyPack, timestampFromDate, type Any } from "@bufbuild/protobuf/wkt";
+import { anyPack, type Any } from "@bufbuild/protobuf/wkt";
 import {
   CircularFilamentSchema,
   CircularWindingPackSchema,
@@ -17,16 +17,10 @@ import {
   ToroidalShellSchema,
 } from "../gen/nebula/core/v1/component_pb";
 import {
-  EntityDraftSchema,
   EntityKind,
-  EntityRefSchema,
   LibrarySourceSchema,
-  MintedBy,
-  VersionMetaSchema,
-  type EntityDraft,
   type EntityRef,
   type LibrarySource,
-  type VersionMeta,
 } from "../gen/nebula/core/v1/entity_pb";
 import {
   CircuitSchema,
@@ -59,13 +53,27 @@ import {
   type Template,
 } from "../gen/nebula/core/v1/project_pb";
 import { SchemaRegistry } from "../schema/registry";
+import {
+  acmeStepExtensions,
+  conceptTraits,
+  coreStepExtensions,
+} from "./extensions";
 import { acmeDemoDescriptorSet } from "./fixtures/acme-demo";
+import { baselineSetup, starterSetup } from "./setupFixtures";
+import {
+  at,
+  componentRef,
+  entity,
+  pack,
+  version,
+  type EntityRecord,
+} from "./records";
+
+export { componentRef, type EntityRecord } from "./records";
 import { fourierPoint } from "./tessellate";
 
 // Fixtures are built with the generated types so they stay schema-correct
 // (docs/UI.md Section 7).
-
-const at = (iso: string) => timestampFromDate(new Date(iso));
 
 const abi = {
   compiler: "clang 19.1",
@@ -110,7 +118,9 @@ export function pluginFixtures(): PluginInfo[] {
           id: kit.id,
           kind: ExtensionKind.CONCEPT,
           displayName: kit.name,
+          providedTraits: [...(conceptTraits[kit.id] ?? [])],
         })),
+        ...coreStepExtensions,
       ],
       smoke: [{ gpuModel: "MI300X", result: SmokeResult.PASSED }],
     }),
@@ -121,14 +131,7 @@ export function pluginFixtures(): PluginInfo[] {
       abi,
       soHash: "sha256:acme1200",
       extensions: [
-        {
-          id: "acme.demo.solver",
-          kind: ExtensionKind.SOLVER,
-          displayName: "Demo solver",
-          calculationType: "equilibrium",
-          configMessage: "acme.demo.v1.DemoSolverConfig",
-          subContracts: ["Equilibrium.Axisym2D"],
-        },
+        ...acmeStepExtensions,
         {
           id: "acme.demo.saddle_coil",
           kind: ExtensionKind.GEOMETRY_COMPONENT,
@@ -190,15 +193,6 @@ export function projectFixtures(): Project[] {
   ];
 }
 
-export interface EntityRecord {
-  projectId: string;
-  draft: EntityDraft;
-  /** Newest first. */
-  versions: VersionMeta[];
-  /** Content of each version by hash, for pinned and latest references. */
-  versionContents?: Record<string, Any>;
-}
-
 /** A project material (A§13.2): a plain resource, not a draft entity. */
 export interface MaterialRecord {
   projectId: string;
@@ -209,55 +203,6 @@ export interface MaterialRecord {
 export interface LibraryState {
   components: LibraryComponent[];
   materials: LibraryMaterial[];
-}
-
-function pack<Desc extends DescMessage>(
-  schema: Desc,
-  init: MessageInitShape<Desc>,
-) {
-  return anyPack(schema, create(schema, init));
-}
-
-function version(
-  hash: string,
-  iso: string,
-  sourceId: string,
-  draftRevision: number,
-): VersionMeta {
-  return create(VersionMetaSchema, {
-    hash,
-    mintedAt: at(iso),
-    mintedBy: MintedBy.RUN_SUBMISSION,
-    sourceId,
-    draftRevision,
-  });
-}
-
-interface RecordInit {
-  kind: EntityKind;
-  id: string;
-  name: string;
-  content?: Any;
-  revision?: number;
-  updatedAt?: string;
-  versions?: VersionMeta[];
-  versionContents?: Record<string, Any>;
-}
-
-function entity(projectId: string, init: RecordInit): EntityRecord {
-  return {
-    projectId,
-    draft: create(EntityDraftSchema, {
-      kind: init.kind,
-      id: init.id,
-      name: init.name,
-      revision: init.revision ?? 1,
-      updatedAt: at(init.updatedAt ?? "2026-10-30T08:00:00Z"),
-      content: init.content,
-    }),
-    versions: init.versions ?? [],
-    versionContents: init.versionContents,
-  };
 }
 
 /** COMPONENT content: the `Component` wrapper around a shape (A§4.1). */
@@ -271,21 +216,6 @@ function component<Desc extends DescMessage>(
     shape: pack(schema, init),
     materialId,
     source,
-  });
-}
-
-type RefState = "draft" | "latest" | { pinned: string };
-
-export function componentRef(id: string, state: RefState = "draft"): EntityRef {
-  return create(EntityRefSchema, {
-    kind: EntityKind.COMPONENT,
-    id,
-    state:
-      state === "draft"
-        ? { case: "draft", value: {} }
-        : state === "latest"
-          ? { case: "latest", value: {} }
-          : { case: "pinned", value: { versionHash: state.pinned } },
   });
 }
 
@@ -706,13 +636,14 @@ export function starterEntities(
   projectId: string,
   conceptId: string,
 ): EntityRecord[] {
+  const setup = starterSetup(projectId, conceptId);
   switch (conceptId) {
     case "nebula.concept.simple_mirror":
-      return mirrorStarter(projectId);
+      return [...mirrorStarter(projectId), ...setup];
     case "nebula.concept.stellarator":
-      return stellaratorStarter(projectId);
+      return [...stellaratorStarter(projectId), ...setup];
     default:
-      return tokamakStarter(projectId);
+      return [...tokamakStarter(projectId), ...setup];
   }
 }
 
@@ -877,5 +808,6 @@ export function entityFixtures(): EntityRecord[] {
         "m-ss316",
       ),
     }),
+    ...baselineSetup(),
   ];
 }

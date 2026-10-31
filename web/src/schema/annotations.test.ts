@@ -4,7 +4,14 @@ import {
   SplineCurveSchema,
 } from "../gen/nebula/core/v1/component_pb";
 import { mockSchema } from "../mocks/fixtures";
-import { componentTraitsOf } from "./annotations";
+import { RegionSchema } from "../gen/nebula/core/v1/region_pb";
+import { PlasmaTargetsSchema } from "../gen/nebula/core/v1/scenario_pb";
+import {
+  componentTraitsOf,
+  messageLabel,
+  roleOf,
+  unknownCoreOptions,
+} from "./annotations";
 
 describe("componentTraitsOf", () => {
   it("reads core shape traits", () => {
@@ -28,5 +35,31 @@ describe("componentTraitsOf", () => {
       currentCarrying: true,
       filament: false,
     });
+  });
+});
+
+describe("core options", () => {
+  it("knows every field option the core declares", () => {
+    const demo = mockSchema.getMessage("acme.demo.v1.DemoSolverConfig")!;
+    // Core options are known: a field with ui.id_ref is editable.
+    for (const field of RegionSchema.fields) {
+      expect(unknownCoreOptions(field)).toEqual([]);
+    }
+    // An option from a newer core is not.
+    expect(unknownCoreOptions(demo.field.futureField!)).toEqual([50999]);
+  });
+
+  it("reads message roles and labels message types", () => {
+    const demo = mockSchema.getMessage("acme.demo.v1.DemoPlasmaTarget")!;
+    expect(roleOf(PlasmaTargetsSchema)).toBe("plasma_target");
+    expect(roleOf(demo)).toBe("plasma_target");
+    expect(messageLabel(PlasmaTargetsSchema)).toBe("Plasma targets");
+    expect(messageLabel(demo)).toBe("Demo plasma target (acme.demo.v1)");
+    expect(
+      mockSchema.messagesWithRole("plasma_target").map((d) => d.typeName),
+    ).toEqual([
+      "nebula.core.v1.PlasmaTargets",
+      "acme.demo.v1.DemoPlasmaTarget",
+    ]);
   });
 });

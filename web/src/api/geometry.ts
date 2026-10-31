@@ -12,7 +12,7 @@ import {
 } from "../gen/nebula/core/v1/geometry_pb";
 import { apiBlob, apiJson } from "./client";
 import { saveDownload } from "./download";
-import { entityPath } from "./entities";
+import { entityPath, useEntities } from "./entities";
 import { queryKeys } from "./queryKeys";
 
 const geometryPath = (projectId: string, geometryId: string) =>
@@ -26,12 +26,54 @@ export function fetchTessellation(
   projectId: string,
   geometryId: string,
   signal?: AbortSignal,
+  versionHash?: string,
 ): Promise<GeometryTessellation> {
+  const query = versionHash
+    ? `?${new URLSearchParams({ version: versionHash }).toString()}`
+    : "";
   return apiJson(
-    `${geometryPath(projectId, geometryId)}/tessellation`,
+    `${geometryPath(projectId, geometryId)}/tessellation${query}`,
     GeometryTessellationSchema,
     { signal },
   );
+}
+
+/**
+ * The tessellation of a geometry as a reference resolves it (D107): its
+ * draft, its head version (`latest`) or a pinned version. For backdrops,
+ * such as region placement; the editor uses useGeometryTessellation.
+ */
+export function useReferenceTessellation(
+  projectId: string,
+  ref: EntityRef | undefined,
+) {
+  const geometries = useEntities(projectId, EntityKind.GEOMETRY);
+  const components = useEntities(projectId, EntityKind.COMPONENT);
+  const summary = geometries.data?.find((g) => g.id === ref?.id);
+  let versionHash: string | undefined;
+  let fingerprint: string | undefined;
+  if (ref?.state.case === "pinned") {
+    versionHash = ref.state.value.versionHash;
+    fingerprint = `v:${versionHash}`;
+  } else if (ref?.state.case === "latest") {
+    versionHash = summary?.headHash || undefined;
+    fingerprint = versionHash && `v:${versionHash}`;
+  } else if (ref?.id && summary && components.data) {
+    // A draft build follows the geometry and component drafts.
+    fingerprint = [
+      `d:${summary.revision}`,
+      ...components.data.map((c) => `${c.id}:${c.revision}:${c.headHash}`),
+    ].join("|");
+  }
+  const geometryId = ref?.id ?? "";
+  return useQuery({
+    queryKey: queryKeys.tessellation(projectId, geometryId, fingerprint ?? ""),
+    queryFn: ({ signal }) =>
+      fetchTessellation(projectId, geometryId, signal, versionHash),
+    enabled: Boolean(geometryId && fingerprint),
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2] === geometryId ? previous : undefined,
+  });
 }
 
 /**

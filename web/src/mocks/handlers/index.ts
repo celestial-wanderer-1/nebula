@@ -1,16 +1,5 @@
 import { http, HttpResponse } from "msw";
-import {
-  ApiErrorSchema,
-  DraftConflictSchema,
-} from "../../gen/nebula/core/v1/errors_pb";
-import {
-  CreateEntityRequestSchema,
-  EntityDraftSchema,
-  EntityKind,
-  ListEntitiesResponseSchema,
-  ListVersionsResponseSchema,
-  UpdateDraftRequestSchema,
-} from "../../gen/nebula/core/v1/entity_pb";
+import { EntityDraftSchema } from "../../gen/nebula/core/v1/entity_pb";
 import { GeometryTessellationSchema } from "../../gen/nebula/core/v1/geometry_pb";
 import {
   AddToLibraryRequestSchema,
@@ -36,45 +25,22 @@ import {
   TemplateSchema,
 } from "../../gen/nebula/core/v1/project_pb";
 import { VersionInfoSchema } from "../../gen/nebula/core/v1/version_pb";
-import { ENTITY_SEGMENTS } from "../../api/entities";
-import { downloadName, type StoreResult } from "../store";
+import { downloadName } from "../store";
 import { store } from "../state";
 import { MOCK_BUILD_ID } from "../token";
-import { apiError, notFound, proto, readProto, unauthorized } from "./util";
-
-const kindBySegment = new Map(
-  Object.entries(ENTITY_SEGMENTS)
-    .filter(([, segment]) => segment)
-    .map(([kind, segment]) => [segment, Number(kind) as EntityKind]),
-);
-
-function entityKind(segment: unknown): EntityKind | undefined {
-  return typeof segment === "string" ? kindBySegment.get(segment) : undefined;
-}
-
-/** Maps a store result to its response; failures become ApiError bodies. */
-function reply<T>(
-  result: StoreResult<T>,
-  respond: (value: T) => Response,
-): Response {
-  return result.ok
-    ? respond(result.value)
-    : apiError(result.status, result.code, result.message);
-}
-
-const created = { status: 201 };
-
-const nameRequired = () =>
-  proto(
-    ApiErrorSchema,
-    {
-      code: "invalid",
-      message: "Validation failed",
-      violations: [{ path: "name", message: "A name is required" }],
-    },
-    { status: 422 },
-  );
-const noContent = () => new HttpResponse(null, { status: 204 });
+import { entityHandlers } from "./entities";
+import { setupHandlers } from "./setup";
+import {
+  apiError,
+  created,
+  nameRequired,
+  noContent,
+  notFound,
+  proto,
+  readProto,
+  reply,
+  unauthorized,
+} from "./util";
 
 // Paths the server owns; anything else (the bundle, assets) passes through.
 const API_PATH =
@@ -286,14 +252,17 @@ export const restHandlers = [
   http.get(
     "/projects/:projectId/geometries/:geometryId/tessellation",
     ({ params, request }) => {
+      const query = new URL(request.url).searchParams;
+      const version = query.get("version") ?? undefined;
       const tessellation = store.tessellation(
         String(params.projectId),
         String(params.geometryId),
-        new URL(request.url).searchParams.get("component") ?? undefined,
+        query.get("component") ?? undefined,
+        version,
       );
       return tessellation
         ? proto(GeometryTessellationSchema, tessellation)
-        : notFound("Geometry");
+        : notFound(version ? "Version" : "Geometry");
     },
   ),
 
@@ -317,94 +286,8 @@ export const restHandlers = [
     },
   ),
 
-  // Generic entity collections (A§13.2).
+  ...setupHandlers,
 
-  http.get("/projects/:projectId/:segment", ({ params }) => {
-    const kind = entityKind(params.segment);
-    const projectId = String(params.projectId);
-    if (kind === undefined || !store.project(projectId)) {
-      return notFound("Collection");
-    }
-    return proto(ListEntitiesResponseSchema, {
-      entities: store
-        .entityRecords(projectId, kind)
-        .map((record) => store.summary(record)),
-    });
-  }),
-
-  http.post("/projects/:projectId/:segment", async ({ params, request }) => {
-    const kind = entityKind(params.segment);
-    if (kind === undefined) return notFound("Collection");
-    const body = await readProto(CreateEntityRequestSchema, request);
-    if (!body.name.trim()) return nameRequired();
-    return reply(
-      store.createEntity(
-        String(params.projectId),
-        kind,
-        body.name.trim(),
-        body.content,
-      ),
-      (record) => proto(EntityDraftSchema, record.draft, created),
-    );
-  }),
-
-  http.get("/projects/:projectId/:segment/:id", ({ params }) => {
-    const kind = entityKind(params.segment);
-    const record =
-      kind === undefined
-        ? undefined
-        : store.entity(String(params.projectId), kind, String(params.id));
-    return record ? proto(EntityDraftSchema, record.draft) : notFound("Entity");
-  }),
-
-  http.patch(
-    "/projects/:projectId/:segment/:id",
-    async ({ params, request }) => {
-      const kind = entityKind(params.segment);
-      const record =
-        kind === undefined
-          ? undefined
-          : store.entity(String(params.projectId), kind, String(params.id));
-      if (!record) return notFound("Entity");
-      const ifMatch = /^"?(\d+)"?$/.exec(request.headers.get("If-Match") ?? "");
-      if (!ifMatch) {
-        return apiError(428, "precondition_required", "If-Match is required");
-      }
-      const body = await readProto(UpdateDraftRequestSchema, request);
-      const result = store.updateDraft(record, Number(ifMatch[1]), body);
-      return result.ok
-        ? proto(EntityDraftSchema, result.draft)
-        : proto(
-            DraftConflictSchema,
-            {
-              message: "The draft was changed by another client",
-              current: result.current,
-            },
-            { status: 409 },
-          );
-    },
-  ),
-
-  http.delete("/projects/:projectId/:segment/:id", ({ params }) => {
-    const kind = entityKind(params.segment);
-    if (kind === undefined) return notFound("Entity");
-    return reply(
-      store.deleteEntity(String(params.projectId), kind, String(params.id)),
-      noContent,
-    );
-  }),
-
-  http.get("/projects/:projectId/:segment/:id/versions", ({ params }) => {
-    const kind = entityKind(params.segment);
-    const record =
-      kind === undefined
-        ? undefined
-        : store.entity(String(params.projectId), kind, String(params.id));
-    return record
-      ? proto(ListVersionsResponseSchema, {
-          versions: record.versions,
-          headHash: record.versions[0]?.hash ?? "",
-        })
-      : notFound("Entity");
-  }),
+  // Generic entity collections last: their :segment and :id match anything.
+  ...entityHandlers,
 ];

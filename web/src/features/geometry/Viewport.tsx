@@ -1,14 +1,6 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
-import {
-  Component as ReactComponent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ElementRef,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type ElementRef } from "react";
 import {
   BufferAttribute,
   BufferGeometry,
@@ -21,7 +13,9 @@ import {
   MeshTopology,
   type ComponentTessellation,
 } from "../../gen/nebula/core/v1/geometry_pb";
-import { decodeMesh, meshRevisions, replicaCounts } from "./scene";
+import { decodeMesh } from "../../viewers/three/mesh";
+import { WebGlBoundary } from "../../viewers/WebGlBoundary";
+import { meshRevisions, replicaCounts } from "./scene";
 import { DEFAULT_CAMERA, useGeometryView, type CameraState } from "./store";
 
 // The 3D view of the geometry editor (docs/UI.md Section 6.3). Loaded
@@ -65,28 +59,6 @@ export function Viewport({
       </WebGlBoundary>
     </div>
   );
-}
-
-/** R3F throws when WebGL is unavailable (for example in jsdom). */
-class WebGlBoundary extends ReactComponent<
-  { children: ReactNode },
-  { failed: boolean }
-> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  render() {
-    return this.state.failed ? (
-      <p className="viewport-fallback muted" role="note">
-        3D view unavailable: this browser could not start WebGL.
-      </p>
-    ) : (
-      this.props.children
-    );
-  }
 }
 
 function Scene({

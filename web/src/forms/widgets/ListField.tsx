@@ -4,7 +4,8 @@ import {
   type DescMessage,
 } from "@bufbuild/protobuf";
 import { useId, type ReactNode } from "react";
-import { Widget } from "../../gen/nebula/core/v1/options_pb";
+import { AnySchema, type Any } from "@bufbuild/protobuf/wkt";
+import { IdRef, Widget } from "../../gen/nebula/core/v1/options_pb";
 import { EntityRefSchema } from "../../gen/nebula/core/v1/entity_pb";
 import { fieldLabel, quantityOf, uiHintOf } from "../../schema/annotations";
 import { useFormContext } from "../context";
@@ -19,6 +20,8 @@ import {
   type NumericValue,
 } from "../values";
 import { NumberInput } from "./NumberInput";
+import { AnyListField } from "./AnyField";
+import { IdRefListField } from "./IdRefField";
 import { RawJsonField } from "./RawJsonField";
 
 /** `repeated` fields: scalar lists and lists of messages. */
@@ -33,6 +36,33 @@ export function ListField({
   onChange: (value: unknown[]) => void;
   path: string;
 }) {
+  if (
+    field.listKind === "message" &&
+    field.message.typeName === AnySchema.typeName
+  ) {
+    return (
+      <AnyListField
+        field={field}
+        value={value as Any[]}
+        onChange={onChange}
+        path={path}
+      />
+    );
+  }
+  if (
+    field.listKind === "scalar" &&
+    field.scalar === ScalarType.STRING &&
+    uiHintOf(field).idRef !== IdRef.UNSPECIFIED
+  ) {
+    return (
+      <IdRefListField
+        field={field}
+        value={value as string[]}
+        onChange={onChange}
+        path={path}
+      />
+    );
+  }
   if (
     field.listKind === "message" &&
     field.message.typeName !== EntityRefSchema.typeName &&

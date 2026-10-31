@@ -13,11 +13,14 @@ export function MessageFields({
   value,
   onChange,
   path,
+  only,
 }: {
   desc: DescMessage;
   value: MessageValue;
   onChange: (value: MessageValue) => void;
   path: string;
+  /** Names of the fields and oneofs to render; all when unset. */
+  only?: readonly string[];
 }) {
   const set = (localName: string, next: unknown) =>
     onChange({ ...value, [localName]: next });
@@ -44,20 +47,32 @@ export function MessageFields({
 
   return (
     <div className="message-fields">
-      {layoutMessage(desc).map((group) =>
-        group.name ? (
-          <Collapsible.Root key={group.name} defaultOpen className="group">
-            <Collapsible.Trigger className="group-trigger">
-              {group.name}
-            </Collapsible.Trigger>
-            <Collapsible.Content className="group-content">
-              {group.items.map(renderItem)}
-            </Collapsible.Content>
-          </Collapsible.Root>
-        ) : (
-          group.items.map(renderItem)
-        ),
-      )}
+      {layoutMessage(desc)
+        .map((group) => ({
+          ...group,
+          items: only
+            ? group.items.filter((item) =>
+                only.includes(
+                  item.kind === "field" ? item.field.name : item.oneof.name,
+                ),
+              )
+            : group.items,
+        }))
+        .filter((group) => group.items.length > 0)
+        .map((group) =>
+          group.name ? (
+            <Collapsible.Root key={group.name} defaultOpen className="group">
+              <Collapsible.Trigger className="group-trigger">
+                {group.name}
+              </Collapsible.Trigger>
+              <Collapsible.Content className="group-content">
+                {group.items.map(renderItem)}
+              </Collapsible.Content>
+            </Collapsible.Root>
+          ) : (
+            group.items.map(renderItem)
+          ),
+        )}
     </div>
   );
 }

@@ -7,7 +7,14 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { anyUnpack, type Any } from "@bufbuild/protobuf/wkt";
 import { CircularFilamentSchema } from "../gen/nebula/core/v1/component_pb";
+import { IdRef } from "../gen/nebula/core/v1/options_pb";
+import { MeshVolumeRegionSchema } from "../gen/nebula/core/v1/region_pb";
+import {
+  CircuitCurrentSchema,
+  ScenarioSchema,
+} from "../gen/nebula/core/v1/scenario_pb";
 import { FieldViolationSchema } from "../gen/nebula/core/v1/errors_pb";
 import { mockSchema } from "../mocks/fixtures";
 import { renderConnected } from "../test/render";
@@ -28,6 +35,7 @@ function Harness<Desc extends DescMessage>({
   projectId?: string;
   readOnly?: boolean;
   violations?: ReturnType<typeof create<typeof FieldViolationSchema>>[];
+  idChoices?: Parameters<typeof ConfigForm>[0]["idChoices"];
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -214,10 +222,52 @@ describe("ConfigForm over a plugin message", () => {
     });
   });
 
-  it("renders dataset references as their fields", () => {
-    renderDemo();
-    expect(screen.getByRole("button", { name: "Initial guess" })).toBeVisible();
-    expect(screen.getByLabelText("Content hash")).toBeVisible();
+  it("picks dataset references from input datasets (D144)", async () => {
+    const { latest } = renderDemo();
+    const picker = screen.getByRole("group", { name: "Initial guess" });
+    await userEvent.selectOptions(
+      within(picker).getByLabelText("Source"),
+      "Input dataset",
+    );
+    const input = within(picker).getByLabelText("Input dataset");
+    await waitFor(() =>
+      expect(
+        within(input).getByText(/Reconstructed equilibrium, shot 4521/),
+      ).toBeInTheDocument(),
+    );
+    await userEvent.selectOptions(input, "in-shot4521");
+    expect(latest()?.initialGuess).toMatchObject({
+      owner: "in-shot4521",
+      contentHash: "sha256:in-shot4521",
+    });
+  });
+
+  it("picks dataset references from committed run outputs", async () => {
+    const { latest } = renderDemo();
+    const picker = screen.getByRole("group", { name: "Initial guess" });
+    await userEvent.selectOptions(
+      within(picker).getByLabelText("Source"),
+      "Run output",
+    );
+    const run = within(picker).getByLabelText("Run");
+    await waitFor(() =>
+      expect(within(run).getByText("Field to stability #11")).toBeVisible(),
+    );
+    // Only completed runs have committed every output.
+    expect(within(run).queryByText("Field to stability #12")).toBeNull();
+    await userEvent.selectOptions(run, "r-11");
+    const output = within(picker).getByLabelText("Output dataset");
+    await waitFor(() =>
+      expect(within(output).getAllByRole("option").length).toBeGreaterThan(1),
+    );
+    await userEvent.selectOptions(
+      output,
+      within(output).getByText(/^equilibrium · \/equilibrium/),
+    );
+    expect(latest()?.initialGuess).toMatchObject({
+      owner: "r-11",
+      contentHash: "sha256:r-11-t1-equilibrium",
+    });
   });
 
   it("hides hidden fields and shows newer-core fields read-only", () => {
@@ -271,5 +321,105 @@ describe("ConfigForm over a core message (D111)", () => {
       name: "Discretization",
     }).parentElement!;
     expect(within(group).getByLabelText("Segments")).toHaveValue("128");
+  });
+});
+
+describe("ConfigForm ID and Any fields", () => {
+  it("picks IDs from the editing context and flags unknown ones (D114)", async () => {
+    const onValue = vi.fn();
+    renderConnected(
+      <Harness
+        schema={CircuitCurrentSchema}
+        initial={create(CircuitCurrentSchema, { circuitId: "ckt-gone" })}
+        onValue={onValue}
+        idChoices={{
+          [IdRef.CIRCUIT]: [{ id: "ckt-pf", label: "PF (ckt-pf)" }],
+        }}
+      />,
+    );
+    const select = screen.getByLabelText("Circuit");
+    expect(select.closest(".field")).toHaveTextContent(
+      "No circuit “ckt-gone” here",
+    );
+    await userEvent.selectOptions(select, "ckt-pf");
+    expect(onValue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ circuitId: "ckt-pf" }),
+    );
+  });
+
+  it("toggles repeated IDs", async () => {
+    const onValue = vi.fn();
+    renderConnected(
+      <Harness
+        schema={MeshVolumeRegionSchema}
+        initial={create(MeshVolumeRegionSchema)}
+        onValue={onValue}
+        idChoices={{
+          [IdRef.COMPONENT]: [
+            { id: "a", label: "Coil A" },
+            { id: "b", label: "Coil B" },
+          ],
+        }}
+      />,
+    );
+    await userEvent.click(screen.getByRole("checkbox", { name: "Coil B" }));
+    expect(onValue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ componentIds: ["b"] }),
+    );
+  });
+
+  it("offers core and plugin messages of an Any field's role", async () => {
+    const onValue = vi.fn();
+    renderConnected(
+      <Harness
+        schema={ScenarioSchema}
+        initial={create(ScenarioSchema)}
+        onValue={onValue}
+        projectId="p-baseline"
+      />,
+    );
+    const add = screen.getByLabelText("Add plasma targets");
+    expect(
+      within(add)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "Choose a type…",
+      "Plasma targets",
+      "Demo plasma target (acme.demo.v1)",
+    ]);
+    await userEvent.selectOptions(add, "acme.demo.v1.DemoPlasmaTarget");
+    const item = screen.getByRole("listitem", { name: "Plasma targets 1" });
+    await userEvent.type(within(item).getByLabelText("Ripple limit"), "0.01");
+    const targets = (onValue.mock.lastCall?.[0] as { plasmaTargets: Any[] })
+      .plasmaTargets;
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.typeUrl).toBe(
+      "type.googleapis.com/acme.demo.v1.DemoPlasmaTarget",
+    );
+    const demo = mockSchema.getMessage("acme.demo.v1.DemoPlasmaTarget")!;
+    expect(anyUnpack(targets[0]!, demo)).toMatchObject({ rippleLimit: 0.01 });
+  });
+
+  it("shows an Any value of an unknown type read-only", () => {
+    renderConnected(
+      <Harness
+        schema={ScenarioSchema}
+        initial={create(ScenarioSchema, {
+          plasmaTargets: [
+            {
+              typeUrl: "type.googleapis.com/other.v1.Target",
+              value: new Uint8Array([8, 1]),
+            },
+          ],
+        })}
+        projectId="p-baseline"
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Type other.v1.Target is not known to this build; shown read-only.",
+      ),
+    ).toBeVisible();
   });
 });

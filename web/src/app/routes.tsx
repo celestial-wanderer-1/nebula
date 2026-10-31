@@ -1,6 +1,10 @@
 import type { RouteObject } from "react-router";
+import { conductorNetworkRoutes } from "../features/conductor-networks/routes";
 import { geometryRoutes } from "../features/geometry/routes";
 import { libraryRoutes } from "../features/libraries/routes";
+import { regionRoutes } from "../features/regions/routes";
+import { scenarioRoutes } from "../features/scenarios/routes";
+import { workflowRoutes } from "../features/workflows/routes";
 import { ProjectBrowser } from "../features/projects/ProjectBrowser";
 import { ProjectOverview } from "../features/projects/ProjectOverview";
 import { PROJECT_AREAS } from "./areas";
@@ -9,7 +13,14 @@ import { ProjectLayout } from "./ProjectLayout";
 import { Shell } from "./Shell";
 
 // Areas built so far; the rest show the phase that delivers them.
-const builtAreas: RouteObject[] = [...geometryRoutes, ...libraryRoutes];
+const builtAreas: RouteObject[] = [
+  ...geometryRoutes,
+  ...libraryRoutes,
+  ...regionRoutes,
+  ...scenarioRoutes,
+  ...conductorNetworkRoutes,
+  ...workflowRoutes,
+];
 const built = new Set(builtAreas.map((route) => route.path?.split("/")[0]));
 
 // Project-scoped routes are bookmarkable within a launch (docs/UI.md Section 3).

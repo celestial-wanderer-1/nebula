@@ -9,8 +9,10 @@ import {
 import {
   component,
   ComponentTraitsSchema,
+  file_nebula_core_v1_options,
   label,
   quantity,
+  role,
   ui,
   UiHintSchema,
   type ComponentTraits,
@@ -21,7 +23,13 @@ import {
 // Core options occupy 50000-50999 (options.proto).
 const CORE_OPTION_MIN = 50000;
 const CORE_OPTION_MAX = 50999;
-const KNOWN_FIELD_OPTIONS = new Set([quantity.number, ui.number]);
+// Every field option this build's core declares, so adding one to
+// options.proto never turns the fields that carry it read-only.
+const KNOWN_FIELD_OPTIONS = new Set(
+  file_nebula_core_v1_options.extensions
+    .filter((ext) => ext.extendee.typeName === "google.protobuf.FieldOptions")
+    .map((ext) => ext.number),
+);
 
 const emptyHint = create(UiHintSchema);
 const emptyTraits = create(ComponentTraitsSchema);
@@ -52,6 +60,14 @@ export function componentTraitsOf(desc: DescMessage): ComponentTraits {
   return options && hasExtension(options, component)
     ? getExtension(options, component)
     : emptyTraits;
+}
+
+/** The role a message plays in Any fields, such as "plasma_target". */
+export function roleOf(desc: DescMessage): string {
+  const options = desc.proto.options;
+  return options && hasExtension(options, role)
+    ? getExtension(options, role)
+    : "";
 }
 
 /**
@@ -86,4 +102,15 @@ export function enumValueLabel(value: DescEnumValue): string {
     return getExtension(options, label);
   }
   return humanize(value.localName);
+}
+
+/**
+ * A readable name of a message type: "PlasmaTargets" -> "Plasma targets",
+ * with the package for plugin types, so same-named types stay apart.
+ */
+export function messageLabel(desc: DescMessage): string {
+  const words = desc.name.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  const name = humanize(words);
+  const pkg = desc.file.proto.package;
+  return pkg.startsWith("nebula.core.") ? name : `${name} (${pkg})`;
 }

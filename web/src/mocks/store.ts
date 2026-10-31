@@ -1,4 +1,5 @@
 import {
+  clone,
   create,
   equals,
   fromJson,
@@ -18,6 +19,9 @@ import {
   EntityChangeSchema,
   EntityDraftSchema,
   EntityKind,
+  EntityVersionSchema,
+  type EntityRef,
+  type EntityVersion,
   EntitySummarySchema,
   LibrarySourceSchema,
   type EntityChange,
@@ -61,6 +65,17 @@ import {
   type QueueSummary,
 } from "../gen/nebula/core/v1/queue_pb";
 import {
+  InputDatasetSchema,
+  type InputDataset,
+} from "../gen/nebula/core/v1/dataset_pb";
+import type { RunOutput } from "../gen/nebula/core/v1/output_pb";
+import type { Run } from "../gen/nebula/core/v1/run_pb";
+import {
+  WorkflowSchema,
+  type WorkflowTemplate,
+} from "../gen/nebula/core/v1/workflow_pb";
+import type { ValidationIssue } from "../gen/nebula/core/v1/project_pb";
+import {
   entityFixtures,
   libraryFixtures,
   materialFixtures,
@@ -74,10 +89,22 @@ import {
   type LibraryState,
   type MaterialRecord,
 } from "./fixtures";
+import {
+  inputFixtures,
+  outputFixtures,
+  runFixtures,
+  workflowTemplateFixtures,
+  type InputRecord,
+} from "./setupFixtures";
+import { conceptTraits } from "./extensions";
 import { checkGeometry, tessellateShape } from "./tessellate";
+import { validateWorkflow } from "./workflows/validate";
 import { MOCK_BUILD_ID } from "./token";
 
 const EXPORT_FORMAT = "nebula-mock-export/1";
+
+// The 8-byte signature every HDF5 file starts with.
+const HDF5_SIGNATURE = [0x89, 0x48, 0x44, 0x46, 0x0d, 0x0a, 0x1a, 0x0a];
 
 export type DraftUpdateResult =
   { ok: true; draft: EntityDraft } | { ok: false; current: EntityDraft };
@@ -136,6 +163,10 @@ export class MockStore {
   materials: MaterialRecord[] = [];
   library: LibraryState = { components: [], materials: [] };
   queue: QueueSummary = create(QueueSummarySchema);
+  runs: Run[] = [];
+  outputs: RunOutput[] = [];
+  inputs: InputRecord[] = [];
+  workflowTemplates: WorkflowTemplate[] = [];
   /** API version `/version` reports; scenarios change it. */
   apiVersion = "";
   private nextId = 1;
@@ -153,6 +184,10 @@ export class MockStore {
     this.entities = entityFixtures();
     this.materials = materialFixtures();
     this.library = libraryFixtures();
+    this.runs = runFixtures();
+    this.outputs = outputFixtures();
+    this.inputs = inputFixtures();
+    this.workflowTemplates = workflowTemplateFixtures();
     this.queue = create(QueueSummarySchema, {
       queued: 2,
       preparing: 0,
@@ -334,6 +369,178 @@ export class MockStore {
     this.entities = this.entities.filter((r) => r !== record);
     this.publishEntity(record, ChangeType.DELETED);
     return ok(record);
+  }
+
+  /** GET /projects/{p}/{kind}/{id}/versions/{hash}. */
+  entityVersion(record: EntityRecord, hash: string): EntityVersion | undefined {
+    const meta = record.versions.find((v) => v.hash === hash);
+    if (!meta) return undefined;
+    return create(EntityVersionSchema, {
+      meta,
+      content: record.versionContents?.[hash],
+    });
+  }
+
+  /**
+   * Content of any entity as a reference resolves it (D107): the draft, the
+   * head version (`latest`) or a pinned version. Undefined when missing.
+   */
+  resolve(projectId: string, ref: EntityRef): Any | undefined {
+    const record = this.entity(projectId, ref.kind, ref.id);
+    if (!record) return undefined;
+    switch (ref.state.case) {
+      case "pinned":
+        return record.versionContents?.[ref.state.value.versionHash];
+      case "latest": {
+        const head = record.versions[0]?.hash;
+        return head ? record.versionContents?.[head] : undefined;
+      }
+      default:
+        return record.draft.content;
+    }
+  }
+
+  // Runs and outputs (A§13.2). P4 adds submission and the queue.
+
+  runList(projectId: string): Run[] {
+    return this.runs.filter((run) => run.projectId === projectId);
+  }
+
+  run(projectId: string, runId: string): Run | undefined {
+    return this.runList(projectId).find((run) => run.id === runId);
+  }
+
+  runOutputs(runId: string): RunOutput[] {
+    return this.outputs.filter((output) => output.runId === runId);
+  }
+
+  // Input datasets (D144).
+
+  inputList(projectId: string): InputDataset[] {
+    return this.inputs
+      .filter((record) => record.projectId === projectId)
+      .map((record) => record.dataset);
+  }
+
+  /**
+   * Ingests an uploaded HDF5 file: checks the signature, hashes and
+   * versions it (D144). The mock does not read the file's datasets.
+   */
+  uploadInput(
+    projectId: string,
+    name: string,
+    subContract: string,
+    bytes: Uint8Array,
+  ): StoreResult<InputDataset> {
+    if (!this.project(projectId)) return notFound("Project");
+    if (!HDF5_SIGNATURE.every((byte, i) => bytes[i] === byte)) {
+      return fail(422, "invalid", "Not an HDF5 file");
+    }
+    if (!subContract) {
+      return fail(422, "invalid", "A sub-contract is required");
+    }
+    const id = this.newId("in");
+    const hash = `sha256:${id}-${bytes.length}`;
+    const dataset = create(InputDatasetSchema, {
+      id,
+      name: name || id,
+      subContract,
+      versionHash: hash,
+      sizeBytes: BigInt(bytes.length),
+      uploadedAt: timestampNow(),
+      dataset: {
+        owner: id,
+        filePath: `inputs/${id}.h5`,
+        datasetPath: "/",
+        contentHash: hash,
+      },
+    });
+    this.inputs.push({ projectId, dataset });
+    return ok(dataset);
+  }
+
+  // Workflows (D50).
+
+  /** Standard chains and the project concept's default workflow (D86). */
+  templatesFor(projectId: string): WorkflowTemplate[] {
+    const concept = this.project(projectId)?.concept?.conceptId ?? "";
+    return this.workflowTemplates.filter(
+      (t) => !t.conceptId || t.conceptId === concept,
+    );
+  }
+
+  instantiateWorkflow(
+    projectId: string,
+    templateId: string,
+    name: string,
+  ): StoreResult<EntityRecord> {
+    const template = this.templatesFor(projectId).find(
+      (t) => t.id === templateId,
+    );
+    if (!template)
+      return fail(422, "invalid", `Unknown template ${templateId}`);
+    const workflow = clone(
+      WorkflowSchema,
+      template.workflow ?? create(WorkflowSchema),
+    );
+    workflow.templateId = templateId;
+    return this.createEntity(
+      projectId,
+      EntityKind.WORKFLOW,
+      name || template.name,
+      anyPack(WorkflowSchema, workflow),
+    );
+  }
+
+  /** POST /projects/{p}/workflows/{w}/validate on the draft. */
+  validateWorkflow(
+    projectId: string,
+    workflowId: string,
+    gpus: number,
+  ): StoreResult<ValidationIssue[]> {
+    const record = this.entity(projectId, EntityKind.WORKFLOW, workflowId);
+    if (!record) return notFound("Workflow");
+    const workflow =
+      (record.draft.content &&
+        anyUnpack(record.draft.content, WorkflowSchema)) ??
+      create(WorkflowSchema);
+    const concept = this.project(projectId)?.concept?.conceptId ?? "";
+    return ok(
+      validateWorkflow(
+        workflow,
+        {
+          extensions: new Map(
+            this.plugins.flatMap((p) => p.extensions.map((e) => [e.id, e])),
+          ),
+          conceptTraits: conceptTraits[concept] ?? [],
+          resolve: (ref) => this.resolve(projectId, ref),
+          shapeOf: (geometry, componentId) => {
+            const ref = geometry.components.find((r) => r.id === componentId);
+            const content = ref && this.resolve(projectId, ref);
+            return content ? unwrapComponent(content).shape : undefined;
+          },
+          storedGeometries: (runId) => this.runGeometries(projectId, runId),
+          registry: mockSchema.typeRegistry,
+          gpusInstalled: this.queue.gpusTotal,
+        },
+        gpus,
+      ),
+    );
+  }
+
+  /** Geometries a Run's pinned workflow version was bound to. */
+  private runGeometries(projectId: string, runId: string): Geometry[] {
+    const run = this.run(projectId, runId);
+    const record =
+      run && this.entity(projectId, EntityKind.WORKFLOW, run.workflowId);
+    const content = record?.versionContents?.[run?.workflowVersionHash ?? ""];
+    const workflow = content && anyUnpack(content, WorkflowSchema);
+    return (workflow?.nodes ?? []).flatMap((node) => {
+      const step = node.kind.case === "solver" ? node.kind.value : undefined;
+      const ref = step?.bindings.find((b) => b.port === "geometry")?.ref;
+      const geometry = ref && this.resolve(projectId, ref);
+      return geometry ? [geometryOf(geometry)] : [];
+    });
   }
 
   // Materials (A§13.2): plain resources, last write wins.
@@ -560,11 +767,17 @@ export class MockStore {
     projectId: string,
     geometryId: string,
     componentId?: string,
+    version?: string,
   ): GeometryTessellation | undefined {
     const record = this.entity(projectId, EntityKind.GEOMETRY, geometryId);
     if (!record) return undefined;
+    if (version && !record.versions.some((v) => v.hash === version)) {
+      return undefined;
+    }
     const registry = mockSchema.typeRegistry;
-    const geometry = geometryOf(record.draft.content);
+    const geometry = geometryOf(
+      version ? record.versionContents?.[version] : record.draft.content,
+    );
     const shapeOf = (id: string) => {
       const resolved = this.resolveReference(projectId, geometry, id);
       return resolved?.content

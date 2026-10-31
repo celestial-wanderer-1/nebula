@@ -98,12 +98,48 @@ These implementation details are what the FastAPI server must match:
   the geometry name sanitised like a project export's; with a version it is
   `<name>-<short hash>.step`. An unknown version returns 404.
 
+- `GET /projects/{p}/{segment}/{id}/versions/{hash}` returns an
+  `EntityVersion`: the `VersionMeta` and the immutable content, in which
+  every reference is pinned. An unknown hash returns 404. The tessellation
+  takes `?version={hash}` too, to build a geometry version.
+- Region, Scenario, ConductorNetwork and Workflow drafts use the generic
+  entity routes; their content is a `nebula.core.v1.Region`, `Scenario`,
+  `ConductorNetwork` or `Workflow`. String fields annotated with
+  `ui.id_ref` hold stable IDs (components, circuits, elements, supplies).
+  New elements, supplies and feedback loops get their ID from the client
+  when they are created.
+- `GET /projects/{p}/workflow-templates` lists `WorkflowTemplate`s: the
+  standard chains and the project concept's default workflow.
+  `POST /projects/{p}/workflows/instantiate` takes an
+  `InstantiateWorkflowRequest` and returns 201 with the new `EntityDraft`,
+  or 422 for a template the project cannot use.
+- `POST /projects/{p}/workflows/{w}/validate` validates the saved draft and
+  takes a `ValidateWorkflowRequest` (`gpus`, 0 for the default). It returns a
+  `ValidateWorkflowResponse`. Issue paths are `nodes/{id}`,
+  `nodes/{id}/ports/{port}`, `edges/{id}` or empty, and every issue has a
+  `code`: `empty`, `unknown_extension`, `invalid_parent`, `missing_input`,
+  `unknown_port`, `port_mismatch`, `time_series`, `cycle`, `missing_trait`,
+  `circuit`, `geometry`, `rank_count` or `gpus`.
+- Workflow ports come from the manifests on `/plugins`: an `Extension`'s
+  `inputs` and `outputs` are `PortDecl`s typed by sub-contract or, for inputs
+  bound with a reference, by entity kind. A stored-output node has one
+  output port named `output`, and an input-dataset node one named
+  `dataset`.
+- `GET /projects/{p}/inputs` lists `InputDataset`s. `POST /projects/{p}/inputs?name=&sub_contract=`
+  uploads an HDF5 file as the raw body (`Content-Type: application/x-hdf5`)
+  and returns 201 with the `InputDataset`. A body without the HDF5 signature
+  returns 422.
+- `GET /projects/{p}/runs` returns a `ListRunsResponse`, newest first, and
+  `GET /projects/{p}/runs/{r}/outputs` returns a `ListRunOutputsResponse`.
+
 ## Bundles
 
-The geometry editor's 3D viewport (`src/features/geometry/Viewport.tsx`)
-loads lazily, so three.js and React Three Fiber are a separate chunk that is
-fetched only when a geometry is opened. Headless Playwright runs draw it with
-software WebGL (SwiftShader; see `playwright.config.ts`).
+Heavy views load lazily through `src/viewers/lazy.tsx`, so each library is
+a separate chunk fetched only where it is used: three.js and React Three
+Fiber with the geometry viewport and the region placement view, React Flow
+with the workflow canvas, and Plotly (its basic bundle, without the WebGL
+traces) with charts. Headless Playwright runs draw WebGL views with software
+WebGL (SwiftShader; see `playwright.config.ts`).
 
 ## Static serving contract
 

@@ -95,7 +95,9 @@ test("opens direct project URLs, scrubs the token and needs it again after reloa
   const errors = trackErrors(page);
   await page.goto(`/p/p-baseline/workflows${TOKEN}`);
   await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible();
-  await expect(page.getByText("This area arrives in phase P3.")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Field to stability" }),
+  ).toBeVisible();
   expect(new URL(page.url()).hash).toBe("");
   expect(new URL(page.url()).pathname).toBe("/p/p-baseline/workflows");
 

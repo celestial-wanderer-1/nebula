@@ -23,6 +23,21 @@ export const queryKeys = {
     [projectId, kind, id, "draft"] as const,
   versions: (projectId: string, kind: EntityKind, id: string) =>
     [projectId, kind, id, "versions"] as const,
+  // Versions are immutable, so the content of one never goes stale.
+  entityVersion: (
+    projectId: string,
+    kind: EntityKind,
+    id: string,
+    hash: string,
+  ) => [projectId, kind, id, "versions", hash] as const,
+  workflowTemplates: (projectId: string) =>
+    [projectId, "workflow-templates"] as const,
+  runs: (projectId: string) => [projectId, "runs", "list"] as const,
+  run: (projectId: string, runId: string) =>
+    [projectId, "runs", runId] as const,
+  runOutputs: (projectId: string, runId: string) =>
+    [projectId, "runs", runId, "outputs"] as const,
+  inputs: (projectId: string) => [projectId, "inputs", "list"] as const,
   // The fingerprint names the inputs the mesh was built from, so each new
   // revision is a new query (D148).
   tessellation: (projectId: string, geometryId: string, fingerprint: string) =>

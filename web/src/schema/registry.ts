@@ -12,6 +12,7 @@ import {
   type FileDescriptorProto,
 } from "@bufbuild/protobuf/wkt";
 import type { PluginInfo } from "../gen/nebula/core/v1/plugin_pb";
+import { roleOf } from "./annotations";
 import { coreFile, coreRegistry } from "./core";
 
 /**
@@ -70,6 +71,20 @@ export class SchemaRegistry {
       coreRegistry,
       ...this.pools.flatMap((pool) => (pool.registry ? [pool.registry] : [])),
     );
+  }
+
+  /**
+   * Messages of core and of every plugin that declare a role, such as
+   * "plasma_target", for Any fields restricted to it (`ui.any_role`).
+   */
+  messagesWithRole(role: string): DescMessage[] {
+    const found = new Map<string, DescMessage>();
+    for (const type of this.typeRegistry) {
+      if (type.kind === "message" && roleOf(type) === role) {
+        found.set(type.typeName, type);
+      }
+    }
+    return [...found.values()];
   }
 
   getMessage(typeName: string): DescMessage | undefined {

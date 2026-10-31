@@ -1,6 +1,6 @@
 import type { DescMessage, MessageShape } from "@bufbuild/protobuf";
 import type { FieldViolation } from "../gen/nebula/core/v1/errors_pb";
-import { FormContext } from "./context";
+import { FormContext, type IdChoices } from "./context";
 import { MessageFields, type MessageValue } from "./MessageFields";
 
 /**
@@ -15,6 +15,8 @@ export function ConfigForm<Desc extends DescMessage>({
   violations = [],
   readOnly = false,
   projectId,
+  idChoices,
+  fields,
 }: {
   schema: Desc;
   value: MessageShape<Desc>;
@@ -22,15 +24,22 @@ export function ConfigForm<Desc extends DescMessage>({
   violations?: readonly FieldViolation[];
   readOnly?: boolean;
   projectId?: string;
+  /** IDs offered by ID fields (`ui.id_ref`), from the editing context. */
+  idChoices?: IdChoices;
+  /** Top-level fields to render, for editors that lay out the rest. */
+  fields?: readonly string[];
 }) {
   return (
-    <FormContext.Provider value={{ projectId, readOnly, violations }}>
+    <FormContext.Provider
+      value={{ projectId, readOnly, violations, idChoices }}
+    >
       <div className="config-form" data-message={schema.typeName}>
         <MessageFields
           desc={schema}
           value={value as unknown as MessageValue}
           onChange={(next) => onChange(next as unknown as MessageShape<Desc>)}
           path=""
+          only={fields}
         />
       </div>
     </FormContext.Provider>

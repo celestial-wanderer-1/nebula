@@ -11,6 +11,7 @@ import {
   CreateEntityRequestSchema,
   EntityDraftSchema,
   EntityKind,
+  EntityVersionSchema,
   ListEntitiesResponseSchema,
   ListVersionsResponseSchema,
   UpdateDraftRequestSchema,
@@ -217,6 +218,34 @@ export function useVersions(
         { signal },
       ),
     enabled: Boolean(projectId && id),
+  });
+}
+
+/**
+ * One version with its content, in which every reference is pinned
+ * (A§4.2). Versions never change, so the query never refetches.
+ */
+export function useEntityVersion(
+  projectId: string | undefined,
+  kind: EntityKind,
+  id: string | undefined,
+  hash: string | undefined,
+) {
+  return useQuery({
+    queryKey: queryKeys.entityVersion(
+      projectId ?? "",
+      kind,
+      id ?? "",
+      hash ?? "",
+    ),
+    queryFn: ({ signal }) =>
+      apiJson(
+        `${entityPath(projectId ?? "", kind, id ?? "")}/versions/${encodeURIComponent(hash ?? "")}`,
+        EntityVersionSchema,
+        { signal },
+      ),
+    enabled: Boolean(projectId && id && hash),
+    staleTime: Infinity,
   });
 }
 
