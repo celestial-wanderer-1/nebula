@@ -3,6 +3,7 @@ syntax = "proto3";
 package nebula.core.v1;
 
 import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/output.proto";
 
 enum PluginOrigin {
   PLUGIN_ORIGIN_UNSPECIFIED = 0;
@@ -51,6 +52,8 @@ message PortDecl {
   // A workflow is valid without this input bound.
   bool optional = 3;
   string description = 4;
+  // For outputs: what the output holds, which selects its viewers (D87).
+  OutputKind output_kind = 5;
 }
 
 // Default GPU count and the rank counts a step supports (D102, D116).

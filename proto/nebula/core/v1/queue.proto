@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package nebula.core.v1;
 
+import "google/protobuf/timestamp.proto";
+import "nebula/core/v1/run.proto";
+
 // Queue counts shared across projects (D100, D102).
 message QueueSummary {
   uint32 queued = 1;
@@ -11,9 +14,55 @@ message QueueSummary {
   uint32 gpus_busy = 5;
 }
 
-// Event on /ws/queue. Run state changes join this message in P4.
+// A Run in the FIFO queue shared across projects (D100, D102): queued,
+// preparing, running or paused.
+message QueueEntry {
+  string run_id = 1;
+  string project_id = 2;
+  string project_name = 3;
+  string run_name = 4;
+  RunState state = 5;
+  uint32 gpus = 6;
+  // GPU subset while running (D40).
+  repeated uint32 gpu_indices = 7;
+  // 1-based place among waiting Runs; 0 once running.
+  uint32 position = 8;
+  string study_id = 9;
+  google.protobuf.Timestamp submitted_at = 10;
+}
+
+// Response of GET /queue.
+message ListQueueResponse {
+  repeated QueueEntry entries = 1;
+  QueueSummary summary = 2;
+}
+
+// Body of POST /queue/reorder: moves a waiting Run to a 1-based position.
+message ReorderQueueRequest {
+  string run_id = 1;
+  uint32 position = 2;
+}
+
+// A Run's state changed (A§14.1); from the acknowledged log (D106).
+message RunStateChange {
+  string run_id = 1;
+  string project_id = 2;
+  string study_id = 3;
+  RunState state = 4;
+  FailureReason failure = 5;
+  uint32 attempt = 6;
+}
+
+message QueueEntries {
+  repeated QueueEntry entries = 1;
+}
+
+// Event on /ws/queue: counts, the whole queue in order, or one Run's state
+// change. Each overwrites what the client holds (D106).
 message QueueEvent {
   oneof event {
     QueueSummary summary = 1;
+    QueueEntries entries = 2;
+    RunStateChange run_state = 3;
   }
 }

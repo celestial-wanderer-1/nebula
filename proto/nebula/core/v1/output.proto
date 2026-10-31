@@ -4,6 +4,33 @@ package nebula.core.v1;
 
 import "google/protobuf/timestamp.proto";
 import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+import "nebula/core/v1/region.proto";
+
+// Output kinds select the viewers of A§13.6 (D87), refined by region type
+// (D89) and plugin view descriptors.
+enum OutputKind {
+  OUTPUT_KIND_UNSPECIFIED = 0;
+  // Named scalar quantities.
+  OUTPUT_KIND_SCALARS = 1;
+  // Quantities along one coordinate, such as profiles or a field on a line.
+  OUTPUT_KIND_PROFILE = 2;
+  // A field sampled on a Region.
+  OUTPUT_KIND_REGION_FIELD = 3;
+  OUTPUT_KIND_FLUX_SURFACES = 4;
+  OUTPUT_KIND_SPECTRUM = 5;
+  OUTPUT_KIND_EIGENMODE = 6;
+  // An operator for downstream steps; not viewable on its own.
+  OUTPUT_KIND_FIELD_OPERATOR = 7;
+  OUTPUT_KIND_SURFACE = 8;
+  OUTPUT_KIND_FIELD_LINES = 9;
+}
+
+// The time axis of a time-series output (D92, D146).
+message TimeAxis {
+  string base = 1;
+  repeated double times = 2 [(quantity) = {unit: "s"}];
+}
 
 // A committed output of one workflow step of a Run (A§3.4, D122).
 message RunOutput {
@@ -17,6 +44,16 @@ message RunOutput {
   repeated DatasetRef datasets = 6;
   bool time_series = 7;
   google.protobuf.Timestamp committed_at = 8;
+  OutputKind kind = 9;
+  // For outputs sampled on a Region (D89).
+  RegionType region_type = 10;
+  string region_id = 11;
+  // Iteration of a coupled step that committed it (D49).
+  uint32 iteration = 12;
+  uint32 attempt = 13;
+  // Set when the output was reused from another Run's cache entry (D125).
+  string producer_run_id = 14;
+  TimeAxis time = 15;
 }
 
 message ListRunOutputsResponse {
