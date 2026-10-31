@@ -2,11 +2,36 @@ syntax = "proto3";
 
 package nebula.core.v1;
 
+import "google/protobuf/any.proto";
+import "nebula/core/v1/entity.proto";
 import "nebula/core/v1/options.proto";
 
-// A circular filament coil centred on the z axis, the simplest first-party
-// component shape (A§10.1). Further shapes arrive with the geometry editor.
+// Content of every Component draft and version (A§4.1). The shape is a core
+// message below or a plugin GeometryComponent message (D58); the material's
+// resolved content is part of the component hash (D127).
+message Component {
+  google.protobuf.Any shape = 1;
+  // ID of a project material; empty when the component has none.
+  string material_id = 2;
+  // Set when the component was imported from the user-global library (D88).
+  LibrarySource source = 3;
+}
+
+// A point in the global right-handed Cartesian frame (D46).
+message Point3 {
+  double x = 1 [(quantity) = {unit: "m"}];
+  double y = 2 [(quantity) = {unit: "m"}];
+  double z = 3 [(quantity) = {unit: "m"}];
+}
+
+// A circular filament coil centred on the z axis (A§10.1). Turns belong to
+// the circuits it is a member of (D114).
 message CircularFilament {
+  option (component) = {
+    current_carrying: true
+    filament: true
+  };
+
   double major_radius = 1 [
     (quantity) = {
       unit: "m"
@@ -28,13 +53,6 @@ message CircularFilament {
       order: 2
     }
   ];
-  uint32 turns = 3 [
-    (quantity) = {min: 1},
-    (ui) = {
-      order: 3
-      default_json: "1"
-    }
-  ];
   uint32 segments = 4 [
     (quantity) = {
       min: 8
@@ -43,6 +61,261 @@ message CircularFilament {
     (ui) = {
       group: "Discretization"
       default_json: "128"
+    }
+  ];
+
+  reserved 3;
+  reserved "turns";
+}
+
+// A straight-segment filament through its points (A§10.1). An open polyline
+// is a lead: filament circuits must close through leads (D145).
+message PolylineFilament {
+  option (component) = {
+    current_carrying: true
+    filament: true
+  };
+
+  repeated Point3 points = 1 [(ui) = {order: 1}];
+  bool closed = 2 [(ui) = {
+    order: 2
+    help: "Join the last point back to the first."
+  }];
+}
+
+// A B-spline curve: a coil centerline or a limiter profile (A§10.1).
+message SplineCurve {
+  repeated Point3 control_points = 1 [(ui) = {
+    label: "Control points"
+    order: 1
+  }];
+  uint32 degree = 2 [
+    (quantity) = {
+      min: 1
+      max: 7
+    },
+    (ui) = {
+      order: 2
+      default_json: "3"
+    }
+  ];
+  bool periodic = 3 [(ui) = {
+    order: 3
+    help: "Close the curve smoothly."
+  }];
+  uint32 segments = 4 [
+    (quantity) = {
+      min: 8
+      max: 100000
+    },
+    (ui) = {
+      group: "Discretization"
+      default_json: "128"
+    }
+  ];
+}
+
+// One harmonic of a Fourier surface, stellarator-symmetric form:
+// R = sum rmnc cos(m theta - n N_fp phi), Z = sum zmns sin(m theta - n N_fp phi).
+message FourierMode {
+  int32 m = 1 [(quantity) = {min: 0}];
+  int32 n = 2;
+  double rmnc = 3 [(quantity) = {
+    unit: "m"
+    design_variable: true
+  }];
+  double zmns = 4 [(quantity) = {
+    unit: "m"
+    design_variable: true
+  }];
+}
+
+// A toroidal Fourier surface: a plasma boundary or a winding surface (A§10.1).
+message FourierSurface {
+  repeated FourierMode modes = 1 [(ui) = {order: 1}];
+  // Must match the geometry's symmetry metadata (D94).
+  uint32 field_periods = 2 [
+    (quantity) = {min: 1},
+    (ui) = {
+      label: "Field periods (N_fp)"
+      order: 2
+      default_json: "1"
+    }
+  ];
+  uint32 poloidal_points = 3 [
+    (quantity) = {
+      min: 8
+      max: 4096
+    },
+    (ui) = {
+      group: "Discretization"
+      default_json: "64"
+    }
+  ];
+  uint32 toroidal_points = 4 [
+    (quantity) = {
+      min: 8
+      max: 4096
+    },
+    (ui) = {
+      group: "Discretization"
+      default_json: "128"
+    }
+  ];
+}
+
+// A finite-cross-section circular coil with a rectangular winding pack
+// centred on the z axis (A§10.1, D31).
+message CircularWindingPack {
+  option (component) = {current_carrying: true};
+
+  double major_radius = 1 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+      design_variable: true
+    },
+    (ui) = {
+      label: "Major radius"
+      order: 1
+    }
+  ];
+  double height = 2 [
+    (quantity) = {
+      unit: "m"
+      design_variable: true
+    },
+    (ui) = {
+      label: "Height (z)"
+      order: 2
+    }
+  ];
+  double radial_width = 3 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {
+      label: "Radial width"
+      order: 3
+    }
+  ];
+  double vertical_height = 4 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {
+      label: "Vertical height"
+      order: 4
+    }
+  ];
+  uint32 segments = 5 [
+    (quantity) = {
+      min: 8
+      max: 100000
+    },
+    (ui) = {
+      group: "Discretization"
+      default_json: "128"
+    }
+  ];
+}
+
+// A toroidal shell solid with an elliptical cross-section, such as a vacuum
+// vessel (A§10.1).
+message ToroidalShell {
+  double major_radius = 1 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+      design_variable: true
+    },
+    (ui) = {
+      label: "Major radius"
+      order: 1
+    }
+  ];
+  double minor_radius = 2 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+      design_variable: true
+    },
+    (ui) = {
+      label: "Minor radius"
+      order: 2
+    }
+  ];
+  double elongation = 3 [
+    (quantity) = {
+      min: 0.1
+      max: 5
+    },
+    (ui) = {
+      order: 3
+      default_json: "1"
+    }
+  ];
+  double thickness = 4 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {order: 4}
+  ];
+  uint32 segments = 5 [
+    (quantity) = {
+      min: 8
+      max: 4096
+    },
+    (ui) = {
+      group: "Discretization"
+      default_json: "64"
+    }
+  ];
+}
+
+// A cylindrical shell solid on the z axis, such as a mirror vessel (A§10.1).
+message CylindricalShell {
+  double radius = 1 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+      design_variable: true
+    },
+    (ui) = {order: 1}
+  ];
+  double length = 2 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+      design_variable: true
+    },
+    (ui) = {order: 2}
+  ];
+  double z_center = 3 [
+    (quantity) = {unit: "m"},
+    (ui) = {
+      label: "Centre (z)"
+      order: 3
+    }
+  ];
+  double thickness = 4 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {order: 4}
+  ];
+  uint32 segments = 5 [
+    (quantity) = {
+      min: 8
+      max: 4096
+    },
+    (ui) = {
+      group: "Discretization"
+      default_json: "64"
     }
   ];
 }

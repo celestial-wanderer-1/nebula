@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+
+// Material data a component references; inlined into the hash of every
+// component that references it (D127).
+message MaterialProperties {
+  double density = 1 [(quantity) = {
+    unit: "kg/m^3"
+    min: 0
+  }];
+  double electrical_conductivity = 2 [(quantity) = {
+    unit: "S/m"
+    min: 0
+  }];
+  double thermal_conductivity = 3 [(quantity) = {
+    unit: "W/(m K)"
+    min: 0
+  }];
+  double specific_heat = 4 [(quantity) = {
+    unit: "J/(kg K)"
+    min: 0
+  }];
+  double youngs_modulus = 5 [
+    (quantity) = {
+      unit: "Pa"
+      min: 0
+    },
+    (ui) = {label: "Young's modulus"}
+  ];
+  double poisson_ratio = 6 [(quantity) = {
+    min: -1
+    max: 0.5
+  }];
+}
+
+// A project material (A§13.2). Not a draft entity: edits apply directly.
+message Material {
+  string id = 1;
+  string name = 2;
+  MaterialProperties properties = 3;
+  // Set when imported from the user-global library (D88).
+  LibrarySource source = 4;
+}
+
+message ListMaterialsResponse {
+  repeated Material materials = 1;
+}
+
+// Body of POST /projects/{p}/materials and PUT /projects/{p}/materials/{m}.
+message MaterialRequest {
+  string name = 1;
+  MaterialProperties properties = 2;
+}

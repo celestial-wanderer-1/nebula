@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/component.proto";
+import "nebula/core/v1/material.proto";
+
+// An entry of the user-global component library (D88). Its material_id names
+// a global library material.
+message LibraryComponent {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  Component component = 4;
+}
+
+// An entry of the user-global material library (D88).
+message LibraryMaterial {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  MaterialProperties properties = 4;
+}
+
+message ListLibraryComponentsResponse {
+  repeated LibraryComponent components = 1;
+}
+
+message ListLibraryMaterialsResponse {
+  repeated LibraryMaterial materials = 1;
+}
+
+// Body of POST /projects/{p}/components/import and /materials/import: copy a
+// global library entry into the project, keeping a provenance link (D88).
+// Importing a component also imports its material unless the project already
+// holds a copy of that entry.
+message ImportFromLibraryRequest {
+  string entry_id = 1;
+}
+
+// Body of POST /library/components and /library/materials: copy a project
+// item into the user-global library.
+message AddToLibraryRequest {
+  string project_id = 1;
+  // Component or material ID in that project.
+  string item_id = 2;
+  string description = 3;
+}

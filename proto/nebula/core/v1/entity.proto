@@ -45,6 +45,12 @@ message EntityDraft {
   google.protobuf.Any content = 6;
 }
 
+// Body of POST /projects/{p}/{kind}: a new entity with its first draft.
+message CreateEntityRequest {
+  string name = 1;
+  google.protobuf.Any content = 2;
+}
+
 // Body of a conditional draft update. The base revision travels in If-Match.
 message UpdateDraftRequest {
   string name = 1;
@@ -65,6 +71,9 @@ message VersionMeta {
   MintedBy minted_by = 3;
   // Run or Study iterate that minted the version.
   string source_id = 4;
+  // Draft revision the version was minted from; a newer draft revision means
+  // the draft changed since this version.
+  uint32 draft_revision = 5;
 }
 
 message ListVersionsResponse {
@@ -117,4 +126,12 @@ message DatasetRef {
   string file_path = 2;
   string dataset_path = 3;
   string content_hash = 4;
+}
+
+// Provenance link of an item copied from the user-global library (D88).
+message LibrarySource {
+  string entry_id = 1;
+  // Entry name at import, kept for display if the entry is later removed.
+  string entry_name = 2;
+  google.protobuf.Timestamp imported_at = 3;
 }

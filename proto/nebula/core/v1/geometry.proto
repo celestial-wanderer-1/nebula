@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/component.proto";
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+import "nebula/core/v1/project.proto";
+
+// Mandatory symmetry metadata of a geometry, the source of its geometric
+// traits `axisymmetric` and `N_fp` (D94, D113).
+message Symmetry {
+  bool axisymmetric = 1 [(ui) = {
+    order: 1
+    help: "Rotationally symmetric about the z axis."
+  }];
+  uint32 field_periods = 2 [
+    (quantity) = {min: 1},
+    (ui) = {
+      label: "Field periods (N_fp)"
+      order: 2
+      default_json: "1"
+    }
+  ];
+}
+
+// A component's membership of a circuit (D114).
+message CircuitMember {
+  // ID of a Component the geometry references.
+  string component_id = 1;
+  // Turns of the member in this circuit; the sign sets the winding direction.
+  int32 turns = 2;
+  // Members sharing a series group carry the same current.
+  uint32 series_group = 3;
+}
+
+// A logical circuit: a stable identity across versions grouping
+// current-carrying components (D114). Scenario currents are keyed by its ID.
+message Circuit {
+  // Stable; assigned when the circuit is created and never reused.
+  string id = 1;
+  string name = 2;
+  repeated CircuitMember members = 3;
+  // Replicate the members over the N_fp field periods (D114).
+  bool replicate_over_periods = 4;
+}
+
+// Content of every Geometry draft and version (A§4.1, A§10.1).
+message Geometry {
+  Symmetry symmetry = 1;
+  // References of kind ENTITY_KIND_COMPONENT in one of the states of D107.
+  repeated EntityRef components = 2;
+  repeated Circuit circuits = 3;
+}
+
+enum MeshTopology {
+  MESH_TOPOLOGY_UNSPECIFIED = 0;
+  // Indexed triangles.
+  MESH_TOPOLOGY_TRIANGLES = 1;
+  // An open polyline through the positions.
+  MESH_TOPOLOGY_LINE_STRIP = 2;
+  // A closed polyline through the positions.
+  MESH_TOPOLOGY_LINE_LOOP = 3;
+}
+
+// A browser mesh. Presentation data only (D156): FP32 positions relative to
+// `origin`, which the viewer adds back.
+message Mesh {
+  MeshTopology topology = 1;
+  // Little-endian float32 x, y, z triples, in metres relative to origin.
+  bytes positions = 2;
+  // Little-endian uint32 triangle indices; empty for lines.
+  bytes indices = 3;
+  Point3 origin = 4;
+}
+
+// The tessellation of one component as the geometry references it (A§3.3).
+message ComponentTessellation {
+  string component_id = 1;
+  // Draft revision built; 0 when built from a version.
+  uint32 revision = 2;
+  // Version built; empty when built from the draft.
+  string version_hash = 3;
+  Mesh mesh = 4;
+  // Set when the geometry worker could not build the component.
+  string error = 5;
+}
+
+// Response of GET /projects/{p}/geometries/{g}/tessellation.
+message GeometryTessellation {
+  repeated ComponentTessellation components = 1;
+  // Checks of the whole geometry, with paths such as "symmetry",
+  // "components/{id}" and "circuits/{id}" (D94, D114, D145).
+  repeated ValidationIssue issues = 2;
+}

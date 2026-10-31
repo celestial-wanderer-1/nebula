@@ -113,6 +113,8 @@ message DemoSolverConfig {
 
 // A plugin GeometryComponent shape (A§10.1).
 message SaddleCoil {
+  option (nebula.core.v1.component) = {current_carrying: true};
+
   double width = 1 [(nebula.core.v1.quantity) = {
     unit: "m"
     min: 0
@@ -131,4 +133,12 @@ message SaddleCoil {
     (nebula.core.v1.ui) = {label: "Toroidal extent"}
   ];
   uint32 turns = 4 [(nebula.core.v1.quantity) = {min: 1}];
+  // Radius of the cylinder the coil lies on, centred on the z axis.
+  double major_radius = 5 [
+    (nebula.core.v1.quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (nebula.core.v1.ui) = {label: "Major radius"}
+  ];
 }
