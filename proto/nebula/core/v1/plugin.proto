@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package nebula.core.v1;
 
+import "nebula/core/v1/entity.proto";
+
 enum PluginOrigin {
   PLUGIN_ORIGIN_UNSPECIFIED = 0;
   // First-party modules declared in the core manifest (D111).
@@ -28,6 +30,36 @@ enum ExtensionKind {
   EXTENSION_KIND_OBJECTIVE = 7;
 }
 
+// Type of a workflow port (A§13.4). Data ports are typed by sub-contract,
+// for example "Equilibrium.Axisym2D"; connecting different sub-contracts needs
+// an explicit adapter (D55). Entity ports are bound with a reference, not an
+// edge (D107).
+message PortType {
+  oneof type {
+    string sub_contract = 1;
+    EntityKind entity = 2;
+  }
+  // A time series on a declared time base (D92).
+  bool time_series = 3;
+  // Name of the time base, shown on time-series edges.
+  string time_base = 4;
+}
+
+message PortDecl {
+  string name = 1;
+  PortType type = 2;
+  // A workflow is valid without this input bound.
+  bool optional = 3;
+  string description = 4;
+}
+
+// Default GPU count and the rank counts a step supports (D102, D116).
+message GpuHint {
+  uint32 default_gpus = 1;
+  // Empty: any count. A step that does not scale lists only 1 (D116).
+  repeated uint32 rank_counts = 2;
+}
+
 message Extension {
   string id = 1;
   ExtensionKind kind = 2;
@@ -37,6 +69,14 @@ message Extension {
   // Fully qualified name of the config message.
   string config_message = 5;
   repeated string sub_contracts = 6;
+  repeated PortDecl inputs = 7;
+  repeated PortDecl outputs = 8;
+  // Capability traits the project concept and the geometry symmetry must
+  // provide, for example "axisymmetric" or "closed_field_lines" (D64, D113).
+  repeated string required_traits = 9;
+  // Topological traits a Concept extension provides (D64).
+  repeated string provided_traits = 10;
+  GpuHint gpu = 11;
 }
 
 enum SmokeResult {

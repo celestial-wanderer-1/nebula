@@ -142,3 +142,38 @@ message SaddleCoil {
     (nebula.core.v1.ui) = {label: "Major radius"}
   ];
 }
+
+// A plugin plasma target, offered wherever core PlasmaTargets is.
+message DemoPlasmaTarget {
+  option (nebula.core.v1.role) = "plasma_target";
+
+  double ripple_limit = 1 [
+    (nebula.core.v1.quantity) = {
+      min: 0
+      max: 0.1
+    },
+    (nebula.core.v1.ui) = {label: "Ripple limit"}
+  ];
+}
+
+// Config of the acme.demo.upsample adapter.
+message DemoAdapterConfig {
+  uint32 toroidal_modes = 1 [
+    (nebula.core.v1.quantity) = {
+      min: 1
+      max: 64
+    },
+    (nebula.core.v1.ui) = {default_json: "8"}
+  ];
+}
+
+// Config of the acme.demo.ripple PostOp.
+message DemoPostOpConfig {
+  uint32 samples = 1 [
+    (nebula.core.v1.quantity) = {
+      min: 2
+      max: 10000
+    },
+    (nebula.core.v1.ui) = {default_json: "360"}
+  ];
+}

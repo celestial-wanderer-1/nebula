@@ -76,6 +76,13 @@ message VersionMeta {
   uint32 draft_revision = 5;
 }
 
+// Response of GET /projects/{p}/{kind}/{id}/versions/{hash}: a version with
+// its immutable content, in which every reference is pinned (A§4.2).
+message EntityVersion {
+  VersionMeta meta = 1;
+  google.protobuf.Any content = 2;
+}
+
 message ListVersionsResponse {
   // Newest first.
   repeated VersionMeta versions = 1;

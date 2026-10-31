@@ -1,0 +1,147 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/any.proto";
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+import "nebula/core/v1/project.proto";
+
+// Position of a node on the editor canvas.
+message NodeLayout {
+  double x = 1;
+  double y = 2;
+}
+
+// A reference bound to an entity-typed input port (D107).
+message InputBinding {
+  string port = 1;
+  EntityRef ref = 2;
+}
+
+// A node running one extension: a solver step, an adapter, a PostOp or an
+// objective (A§13.4).
+message ExtensionStep {
+  string extension_id = 1;
+  // The extension's config message.
+  google.protobuf.Any config = 2;
+  repeated InputBinding bindings = 3;
+}
+
+message ConvergenceCriteria {
+  double tolerance = 1 [
+    (quantity) = {
+      min: 0
+      max: 1
+    },
+    (ui) = {default_json: "1e-6"}
+  ];
+  uint32 max_iterations = 2 [
+    (quantity) = {
+      min: 1
+      max: 10000
+    },
+    (ui) = {default_json: "50"}
+  ];
+}
+
+// Fixed-point iteration of its child nodes (D49).
+message CoupledNode {
+  ConvergenceCriteria convergence = 1;
+}
+
+// Maps its child nodes over the slices of their time-series inputs; their
+// outputs are time series on the same time base (D92).
+message FanOutNode {
+  // Slice indices to map over; empty for all slices.
+  repeated uint32 slices = 1;
+}
+
+// A committed output of an earlier Run fed into a typed port (D22, D26).
+message StoredOutputNode {
+  string run_id = 1;
+  string node_id = 2;
+  string output_name = 3;
+  string content_hash = 4;
+  string sub_contract = 5;
+  bool time_series = 6;
+}
+
+// An ingested input dataset fed into a typed port (D144).
+message InputDatasetNode {
+  string dataset_id = 1;
+  string version_hash = 2;
+  string sub_contract = 3;
+}
+
+message Node {
+  // Stable within the workflow; edges and issues refer to it.
+  string id = 1;
+  string label = 2;
+  NodeLayout layout = 3;
+  // ID of the enclosing coupled or fan-out node; empty at top level.
+  string parent_id = 4;
+  oneof kind {
+    ExtensionStep solver = 10;
+    ExtensionStep adapter = 11;
+    ExtensionStep post_op = 12;
+    ExtensionStep objective = 13;
+    CoupledNode coupled = 14;
+    FanOutNode fan_out = 15;
+    StoredOutputNode stored_output = 16;
+    InputDatasetNode input_dataset = 17;
+  }
+}
+
+message PortRef {
+  string node_id = 1;
+  string port = 2;
+}
+
+// A data edge from an output port to an input port.
+message Edge {
+  string id = 1;
+  PortRef from = 2;
+  PortRef to = 3;
+}
+
+// Content of every Workflow draft and version: a DAG of typed steps (D50).
+// A single calculation is a one-node graph.
+message Workflow {
+  repeated Node nodes = 1;
+  repeated Edge edges = 2;
+  // Template the workflow was instantiated from, if any.
+  string template_id = 3;
+}
+
+// Body of POST /projects/{p}/workflows/{w}/validate, which validates the
+// current draft (D64, D113, D114, D116).
+message ValidateWorkflowRequest {
+  // GPU count to check rank counts against; 0 for the default.
+  uint32 gpus = 1;
+}
+
+message ValidateWorkflowResponse {
+  // Paths are "nodes/{id}", "nodes/{id}/ports/{port}" or "edges/{id}".
+  repeated ValidationIssue issues = 1;
+}
+
+// A concept kit default workflow or a standard chain (D50, D86).
+message WorkflowTemplate {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  // Concept kit the template belongs to; empty for standard chains.
+  string concept_id = 4;
+  Workflow workflow = 5;
+}
+
+message ListWorkflowTemplatesResponse {
+  repeated WorkflowTemplate templates = 1;
+}
+
+// Body of POST /projects/{p}/workflows/instantiate.
+message InstantiateWorkflowRequest {
+  string template_id = 1;
+  string name = 2;
+}

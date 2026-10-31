@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package nebula.core.v1;
 
+import "google/protobuf/timestamp.proto";
+
 // Typed failure reasons of A§3.7 and A§6.8.
 enum FailureReason {
   FAILURE_REASON_UNSPECIFIED = 0;
@@ -23,4 +25,36 @@ enum ProvenanceTag {
   PROVENANCE_TAG_MIXED_BUILDS = 2;
   // Imported with a build that does not match this installation (D100, D149).
   PROVENANCE_TAG_NOT_REPRODUCIBLE_HERE = 3;
+}
+
+// Run states of A§14.1.
+enum RunState {
+  RUN_STATE_UNSPECIFIED = 0;
+  RUN_STATE_QUEUED = 1;
+  // Meshing, partitioning and discretizing before the GPU wait (D121).
+  RUN_STATE_PREPARING = 2;
+  RUN_STATE_RUNNING = 3;
+  RUN_STATE_PAUSED = 4;
+  RUN_STATE_COMPLETED = 5;
+  RUN_STATE_FAILED = 6;
+  RUN_STATE_CANCELLED = 7;
+  RUN_STATE_DISCARDED = 8;
+}
+
+// One execution of a pinned Workflow version (A§4.3, D22).
+message Run {
+  string id = 1;
+  string project_id = 2;
+  string name = 3;
+  string workflow_id = 4;
+  string workflow_version_hash = 5;
+  RunState state = 6;
+  google.protobuf.Timestamp submitted_at = 7;
+  google.protobuf.Timestamp finished_at = 8;
+  repeated ProvenanceTag tags = 9;
+}
+
+message ListRunsResponse {
+  // Newest first.
+  repeated Run runs = 1;
 }

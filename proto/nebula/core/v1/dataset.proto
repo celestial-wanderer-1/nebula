@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/timestamp.proto";
+import "nebula/core/v1/entity.proto";
+
+// An ingested HDF5 input dataset (D144): validated against its sub-contract,
+// hashed and versioned on upload.
+message InputDataset {
+  string id = 1;
+  string name = 2;
+  string sub_contract = 3;
+  string version_hash = 4;
+  uint64 size_bytes = 5;
+  google.protobuf.Timestamp uploaded_at = 6;
+  DatasetRef dataset = 7;
+}
+
+message ListInputDatasetsResponse {
+  repeated InputDataset datasets = 1;
+}

@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/timestamp.proto";
+import "nebula/core/v1/entity.proto";
+
+// A committed output of one workflow step of a Run (A§3.4, D122).
+message RunOutput {
+  string run_id = 1;
+  // Workflow node that produced the output.
+  string node_id = 2;
+  // Output port name.
+  string name = 3;
+  string sub_contract = 4;
+  string content_hash = 5;
+  repeated DatasetRef datasets = 6;
+  bool time_series = 7;
+  google.protobuf.Timestamp committed_at = 8;
+}
+
+message ListRunOutputsResponse {
+  repeated RunOutput outputs = 1;
+}

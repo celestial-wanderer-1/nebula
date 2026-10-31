@@ -40,6 +40,22 @@ message UiHint {
   // Target kind of an EntityRef field; the reference picker lists entities of
   // this kind (D107).
   EntityKind ref_kind = 8;
+  // Kind of ID a string field holds; the form offers the IDs of that kind
+  // from the editing context, for example the circuits of the referenced
+  // geometry (D114, D128).
+  IdRef id_ref = 9;
+  // For a google.protobuf.Any field: only messages declaring this role (the
+  // `role` message option) are offered, from core and from plugins.
+  string any_role = 10;
+}
+
+// Kinds of stable IDs a string field can refer to.
+enum IdRef {
+  ID_REF_UNSPECIFIED = 0;
+  ID_REF_COMPONENT = 1;
+  ID_REF_CIRCUIT = 2;
+  ID_REF_ELEMENT = 3;
+  ID_REF_SUPPLY = 4;
 }
 
 // Core options occupy 50000-50999 on every options message. A field carrying
@@ -60,6 +76,8 @@ message ComponentTraits {
 
 extend google.protobuf.MessageOptions {
   ComponentTraits component = 50001;
+  // Role the message plays in Any fields, for example "plasma_target".
+  string role = 50002;
 }
 
 extend google.protobuf.EnumValueOptions {

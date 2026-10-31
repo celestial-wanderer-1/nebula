@@ -71,9 +71,12 @@ enum IssueSeverity {
 
 message ValidationIssue {
   IssueSeverity severity = 1;
-  // Location inside the snapshot, for example "runs/r-12/provenance".
+  // Location of the issue, for example "runs/r-12/provenance" in a project
+  // snapshot or "nodes/{id}/ports/{port}" in a workflow.
   string path = 2;
   string message = 3;
+  // Machine-readable kind, for example "port_mismatch" or "missing_trait".
+  string code = 4;
 }
 
 // Response of POST /projects/import. project is set when the import succeeded.

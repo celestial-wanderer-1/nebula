@@ -1,0 +1,365 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/component.proto";
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+
+// A direction in the global frame; normalised by consumers.
+message Vector3 {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+// Region types of D89 and D160. The type sets the output layout and the
+// viewers eligible for outputs sampled on the region.
+enum RegionType {
+  REGION_TYPE_UNSPECIFIED = 0;
+  REGION_TYPE_POINTS = 1;
+  REGION_TYPE_LINE = 2;
+  REGION_TYPE_PLANE = 3;
+  REGION_TYPE_BOX_GRID = 4;
+  REGION_TYPE_CYLINDRICAL_GRID = 5;
+  REGION_TYPE_TOROIDAL_GRID = 6;
+  REGION_TYPE_COMPONENT_SURFACE = 7;
+  REGION_TYPE_MESH_VOLUME = 8;
+  REGION_TYPE_STEP_OUTPUT_SURFACE = 9;
+}
+
+message PointsRegion {
+  repeated Point3 points = 1;
+}
+
+message LineRegion {
+  Point3 start = 1 [(ui) = {order: 1}];
+  Point3 end = 2 [(ui) = {order: 2}];
+  uint32 samples = 3 [
+    (quantity) = {
+      min: 2
+      max: 1000000
+    },
+    (ui) = {
+      order: 3
+      default_json: "101"
+    }
+  ];
+}
+
+message PlaneRegion {
+  Point3 center = 1 [(ui) = {
+    label: "Centre"
+    order: 1
+  }];
+  Vector3 normal = 2 [(ui) = {
+    order: 2
+    default_json: "{\"y\": 1}"
+  }];
+  // In-plane direction of the first axis; projected onto the plane.
+  Vector3 u_axis = 3 [(ui) = {
+    label: "First axis"
+    order: 3
+    default_json: "{\"x\": 1}"
+  }];
+  double width = 4 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {order: 4}
+  ];
+  double height = 5 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {order: 5}
+  ];
+  uint32 nu = 6 [
+    (quantity) = {
+      min: 2
+      max: 4096
+    },
+    (ui) = {
+      label: "Samples along first axis"
+      group: "Sampling"
+      default_json: "64"
+    }
+  ];
+  uint32 nv = 7 [
+    (quantity) = {
+      min: 2
+      max: 4096
+    },
+    (ui) = {
+      label: "Samples along second axis"
+      group: "Sampling"
+      default_json: "64"
+    }
+  ];
+}
+
+message BoxGridRegion {
+  Point3 min = 1 [(ui) = {
+    label: "Minimum corner"
+    order: 1
+  }];
+  Point3 max = 2 [(ui) = {
+    label: "Maximum corner"
+    order: 2
+  }];
+  uint32 nx = 3 [
+    (quantity) = {
+      min: 2
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "32"
+    }
+  ];
+  uint32 ny = 4 [
+    (quantity) = {
+      min: 2
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "32"
+    }
+  ];
+  uint32 nz = 5 [
+    (quantity) = {
+      min: 2
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "32"
+    }
+  ];
+}
+
+message CylindricalGridRegion {
+  double r_min = 1 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {
+      label: "R min"
+      order: 1
+    }
+  ];
+  double r_max = 2 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {
+      label: "R max"
+      order: 2
+    }
+  ];
+  double z_min = 3 [
+    (quantity) = {unit: "m"},
+    (ui) = {
+      label: "z min"
+      order: 3
+    }
+  ];
+  double z_max = 4 [
+    (quantity) = {unit: "m"},
+    (ui) = {
+      label: "z max"
+      order: 4
+    }
+  ];
+  double phi_min = 5 [
+    (quantity) = {unit: "rad"},
+    (ui) = {
+      label: "φ min"
+      order: 5
+    }
+  ];
+  double phi_max = 6 [
+    (quantity) = {unit: "rad"},
+    (ui) = {
+      label: "φ max"
+      order: 6
+      default_json: "6.283185307179586"
+    }
+  ];
+  uint32 nr = 7 [
+    (quantity) = {
+      min: 2
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "32"
+    }
+  ];
+  uint32 nz = 8 [
+    (quantity) = {
+      min: 2
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "32"
+    }
+  ];
+  uint32 nphi = 9 [
+    (quantity) = {
+      min: 1
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "16"
+    }
+  ];
+}
+
+// A grid in (rho, theta, phi) about a circular axis of the given major
+// radius, centred on the z axis.
+message ToroidalGridRegion {
+  double major_radius = 1 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {
+      label: "Major radius"
+      order: 1
+    }
+  ];
+  double minor_radius = 2 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {
+      label: "Minor radius (rho max)"
+      order: 2
+    }
+  ];
+  double phi_min = 3 [
+    (quantity) = {unit: "rad"},
+    (ui) = {
+      label: "φ min"
+      order: 3
+    }
+  ];
+  double phi_max = 4 [
+    (quantity) = {unit: "rad"},
+    (ui) = {
+      label: "φ max"
+      order: 4
+      default_json: "6.283185307179586"
+    }
+  ];
+  uint32 nrho = 5 [
+    (quantity) = {
+      min: 2
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "16"
+    }
+  ];
+  uint32 ntheta = 6 [
+    (quantity) = {
+      min: 4
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "32"
+    }
+  ];
+  uint32 nphi = 7 [
+    (quantity) = {
+      min: 1
+      max: 1024
+    },
+    (ui) = {
+      group: "Sampling"
+      default_json: "16"
+    }
+  ];
+}
+
+// The surface of one component of the region's geometry.
+message ComponentSurfaceRegion {
+  string component_id = 1 [(ui) = {
+    label: "Component"
+    id_ref: ID_REF_COMPONENT
+  }];
+  double max_edge_length = 2 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {default_json: "0.05"}
+  ];
+}
+
+// The volume enclosed by components, meshed for volume fields.
+message MeshVolumeRegion {
+  repeated string component_ids = 1 [(ui) = {
+    label: "Components"
+    id_ref: ID_REF_COMPONENT
+  }];
+  double max_cell_size = 2 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {default_json: "0.1"}
+  ];
+}
+
+// A surface emitted by an upstream workflow step, for example the last
+// closed flux surface "lcfs" of an equilibrium (D160). It has no placement
+// until the step has run.
+message StepOutputSurfaceRegion {
+  string surface = 1 [(ui) = {
+    order: 1
+    help: "Output name of the surface, for example lcfs."
+  }];
+  string sub_contract = 2 [(ui) = {
+    label: "Sub-contract"
+    order: 2
+  }];
+  uint32 samples = 3 [
+    (quantity) = {
+      min: 8
+      max: 100000
+    },
+    (ui) = {default_json: "256"}
+  ];
+}
+
+// Content of every Region draft and version (D89, D160).
+message Region {
+  // Geometry the region is placed over; component IDs refer to its components.
+  EntityRef geometry = 1 [(ui) = {
+    order: -1
+    ref_kind: ENTITY_KIND_GEOMETRY
+  }];
+  oneof shape {
+    PointsRegion points = 10;
+    LineRegion line = 11;
+    PlaneRegion plane = 12;
+    BoxGridRegion box_grid = 13;
+    CylindricalGridRegion cylindrical_grid = 14;
+    ToroidalGridRegion toroidal_grid = 15;
+    ComponentSurfaceRegion component_surface = 16;
+    MeshVolumeRegion mesh_volume = 17;
+    StepOutputSurfaceRegion step_output_surface = 18;
+  }
+}

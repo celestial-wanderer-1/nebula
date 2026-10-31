@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/any.proto";
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+import "nebula/core/v1/timeseries.proto";
+
+// The current of one circuit of the scenario's geometry (D114).
+message CircuitCurrent {
+  // Stable circuit ID; must name a circuit of the selected geometry version.
+  string circuit_id = 1 [(ui) = {
+    label: "Circuit"
+    id_ref: ID_REF_CIRCUIT
+  }];
+  // Current per turn for a static scenario.
+  double current = 2 [(quantity) = {
+    unit: "A"
+    design_variable: true
+  }];
+  // Time-dependent current per turn, in A; empty for a static scenario.
+  Waveform waveform = 3;
+}
+
+// Core plasma targets for equilibrium solves.
+message PlasmaTargets {
+  option (role) = "plasma_target";
+
+  double plasma_current = 1 [
+    (quantity) = {
+      unit: "A"
+      design_variable: true
+    },
+    (ui) = {order: 1}
+  ];
+  double beta_poloidal = 2 [
+    (quantity) = {
+      min: 0
+      design_variable: true
+    },
+    (ui) = {
+      label: "β poloidal"
+      order: 2
+    }
+  ];
+  double internal_inductance = 3 [
+    (quantity) = {min: 0},
+    (ui) = {
+      label: "Internal inductance (li)"
+      order: 3
+    }
+  ];
+  double axis_r = 4 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {
+      label: "Magnetic axis R"
+      group: "Magnetic axis"
+    }
+  ];
+  double axis_z = 5 [
+    (quantity) = {unit: "m"},
+    (ui) = {
+      label: "Magnetic axis z"
+      group: "Magnetic axis"
+    }
+  ];
+}
+
+// Content of every Scenario draft and version (D66). Equilibrium and
+// evolution steps emit solved scenarios as versions minted by the Run (D110).
+message Scenario {
+  // Geometry whose circuits the currents are keyed by (D114).
+  EntityRef geometry = 1 [(ui) = {ref_kind: ENTITY_KIND_GEOMETRY}];
+  repeated CircuitCurrent currents = 2;
+  // Core PlasmaTargets or a plugin message with the same role.
+  repeated google.protobuf.Any plasma_targets = 3 [(ui) = {
+    label: "Plasma targets"
+    any_role: "plasma_target"
+  }];
+  EntityRef conductor_network = 4 [(ui) = {
+    label: "Conductor network"
+    ref_kind: ENTITY_KIND_CONDUCTOR_NETWORK
+  }];
+}

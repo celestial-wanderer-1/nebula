@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/options.proto";
+
+enum Interpolation {
+  INTERPOLATION_UNSPECIFIED = 0;
+  INTERPOLATION_LINEAR = 1;
+  // Holds each value until the next time.
+  INTERPOLATION_STEP = 2;
+}
+
+// Values against time (D92). The unit of the values is the unit of the field
+// that holds the waveform.
+message Waveform {
+  repeated double times = 1 [(quantity) = {unit: "s"}];
+  repeated double values = 2;
+  Interpolation interpolation = 3;
+}

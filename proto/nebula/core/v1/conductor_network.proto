@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "nebula/core/v1/entity.proto";
+import "nebula/core/v1/options.proto";
+import "nebula/core/v1/timeseries.proto";
+
+enum ElementModel {
+  ELEMENT_MODEL_UNSPECIFIED = 0;
+  ELEMENT_MODEL_THIN_SHELL = 1;
+  ELEMENT_MODEL_VOLUME = 2;
+}
+
+message Discretization {
+  double max_edge_length = 1 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {default_json: "0.1"}
+  ];
+  uint32 toroidal_segments = 2 [
+    (quantity) = {
+      min: 1
+      max: 4096
+    },
+    (ui) = {default_json: "64"}
+  ];
+  uint32 poloidal_segments = 3 [
+    (quantity) = {
+      min: 1
+      max: 4096
+    },
+    (ui) = {default_json: "32"}
+  ];
+}
+
+// A passive conducting structure, such as a vacuum vessel (D71, D128).
+message PassiveElement {
+  // Stable; assigned when the element is created.
+  string id = 1 [(ui) = {hidden: true}];
+  string name = 2 [(ui) = {order: 1}];
+  string component_id = 3 [(ui) = {
+    label: "Component"
+    order: 2
+    id_ref: ID_REF_COMPONENT
+  }];
+  ElementModel model = 4 [(ui) = {
+    order: 3
+    widget: WIDGET_RADIO
+    default_json: "\"ELEMENT_MODEL_THIN_SHELL\""
+  }];
+  double resistivity = 5 [
+    (quantity) = {
+      unit: "Ohm m"
+      min: 0
+    },
+    (ui) = {order: 4}
+  ];
+  // Wall thickness of a thin-shell element.
+  double thickness = 6 [
+    (quantity) = {
+      unit: "m"
+      min: 0
+    },
+    (ui) = {order: 5}
+  ];
+  Discretization discretization = 7;
+}
+
+// External circuit data of a geometry circuit (D114, D128).
+message CircuitConnection {
+  string circuit_id = 1 [(ui) = {
+    label: "Circuit"
+    order: 1
+    id_ref: ID_REF_CIRCUIT
+  }];
+  double resistance = 2 [
+    (quantity) = {
+      unit: "Ohm"
+      min: 0
+    },
+    (ui) = {
+      label: "External resistance"
+      order: 2
+    }
+  ];
+  double inductance = 3 [
+    (quantity) = {
+      unit: "H"
+      min: 0
+    },
+    (ui) = {
+      label: "External inductance"
+      order: 3
+    }
+  ];
+  // Supply driving the circuit; empty for a passive circuit.
+  string supply_id = 4 [(ui) = {
+    label: "Power supply"
+    order: 4
+    id_ref: ID_REF_SUPPLY
+  }];
+}
+
+message PowerSupply {
+  // Stable; assigned when the supply is created.
+  string id = 1 [(ui) = {hidden: true}];
+  string name = 2 [(ui) = {order: 1}];
+  double voltage_limit = 3 [
+    (quantity) = {
+      unit: "V"
+      min: 0
+    },
+    (ui) = {order: 2}
+  ];
+  double current_limit = 4 [
+    (quantity) = {
+      unit: "A"
+      min: 0
+    },
+    (ui) = {order: 3}
+  ];
+  // Feed-forward voltage, in V.
+  Waveform voltage = 5 [(ui) = {label: "Feed-forward voltage"}];
+}
+
+// A feedback controller acting on a supply (D128).
+message FeedbackLoop {
+  string id = 1 [(ui) = {hidden: true}];
+  string name = 2 [(ui) = {order: 1}];
+  string supply_id = 3 [(ui) = {
+    label: "Power supply"
+    order: 2
+    id_ref: ID_REF_SUPPLY
+  }];
+  // Controlled quantity, for example "plasma_r" or "plasma_z".
+  string sensor = 4 [(ui) = {order: 3}];
+  double gain_p = 5 [(ui) = {
+    label: "Proportional gain"
+    group: "Gains"
+  }];
+  double gain_i = 6 [(ui) = {
+    label: "Integral gain"
+    group: "Gains"
+  }];
+  double gain_d = 7 [(ui) = {
+    label: "Derivative gain"
+    group: "Gains"
+  }];
+}
+
+// Content of every ConductorNetwork draft and version: passive elements and
+// circuit topology built on the geometry's circuits (D71, D128).
+message ConductorNetwork {
+  EntityRef geometry = 1 [(ui) = {
+    order: -1
+    ref_kind: ENTITY_KIND_GEOMETRY
+  }];
+  repeated PassiveElement elements = 2 [(ui) = {label: "Passive elements"}];
+  repeated CircuitConnection circuits = 3;
+  repeated PowerSupply supplies = 4 [(ui) = {label: "Power supplies"}];
+  repeated FeedbackLoop feedback = 5;
+}
