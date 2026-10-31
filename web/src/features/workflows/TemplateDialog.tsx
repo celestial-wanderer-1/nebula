@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../../components/DialogContent";
 import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -54,7 +55,7 @@ export function TemplateDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>New workflow from a template</Dialog.Title>
           <Dialog.Description>
             Start from the concept’s default workflow or a standard chain.
@@ -104,7 +105,7 @@ export function TemplateDialog({
               </button>
             </div>
           </form>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

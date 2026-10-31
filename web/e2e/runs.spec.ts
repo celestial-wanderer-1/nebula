@@ -47,7 +47,7 @@ test("submits a run that mints its drafts and completes with live progress", asy
     "Run completed",
   );
   await expect(
-    page.getByRole("img", { name: "Convergence residuals" }),
+    page.getByRole("figure", { name: "Convergence residuals" }),
   ).toBeVisible();
   const outputs = page.getByRole("region", { name: "Outputs" });
   await expect(outputs).toContainText("Global stability · modes");

@@ -10,6 +10,7 @@ import {
   type ViewParams,
   type ViewPayload,
 } from "../gen/nebula/core/v1/view_pb";
+import { startSpan, VIEW_DRAW } from "../perf";
 import { useChannel, useWsManager } from "./context";
 
 export const VIEWS_CHANNEL = "/ws/views";
@@ -80,6 +81,7 @@ export function useViewJob(
       current.done = true;
       const result = reply.result;
       if (result.case === "payload") {
+        startSpan(VIEW_DRAW);
         setJob({ payload: result.value, pending: false, cached: reply.cached });
       } else {
         const message =

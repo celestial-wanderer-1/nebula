@@ -159,7 +159,7 @@ describe("ProjectBrowser", () => {
   it("saves a project as a template that new projects can use (D86)", async () => {
     await openBrowser();
     await userEvent.click(
-      screen.getByRole("button", { name: "Save Tokamak baseline as template" }),
+      screen.getByRole("button", { name: "Save as template Tokamak baseline" }),
     );
     const dialog = screen.getByRole("dialog", {
       name: "Save “Tokamak baseline” as a template",

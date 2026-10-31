@@ -9,7 +9,7 @@ import { renderRoute } from "../../test/render";
 
 vi.mock("../../viewers/plotly/Chart", () => ({
   Chart: ({ label, data }: { label: string; data: unknown[] }) => (
-    <div role="img" aria-label={label} data-traces={data.length} />
+    <div role="figure" aria-label={label} data-traces={data.length} />
   ),
 }));
 
@@ -94,7 +94,7 @@ describe("ScenarioEditor", () => {
     await userEvent.clear(value);
     await userEvent.type(value, "46000");
     expect(
-      await within(waveform).findByRole("img", {
+      await within(waveform).findByRole("figure", {
         name: "Current of PF against time",
       }),
     ).toHaveAttribute("data-traces", "1");

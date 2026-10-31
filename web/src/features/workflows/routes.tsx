@@ -1,8 +1,16 @@
 import type { RouteObject } from "react-router";
-import { WorkflowEditor } from "./WorkflowEditor";
-import { WorkflowList } from "./WorkflowList";
+
+// Feature areas load lazily, each its own chunk (docs/UI.md P7).
 
 export const workflowRoutes: RouteObject[] = [
-  { path: "workflows", element: <WorkflowList /> },
-  { path: "workflows/:workflowId", element: <WorkflowEditor /> },
+  {
+    path: "workflows",
+    lazy: () =>
+      import("./WorkflowList").then((m) => ({ Component: m.WorkflowList })),
+  },
+  {
+    path: "workflows/:workflowId",
+    lazy: () =>
+      import("./WorkflowEditor").then((m) => ({ Component: m.WorkflowEditor })),
+  },
 ];

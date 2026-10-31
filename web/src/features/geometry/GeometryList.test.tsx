@@ -42,7 +42,9 @@ async function createGeometry(projectId: string, name: string) {
 describe("GeometryList", () => {
   it("lists the project's geometries with links to the editor", async () => {
     renderRoute("/p/p-baseline/geometry");
-    expect(screen.getByRole("heading", { name: "Geometry" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Geometry" }),
+    ).toBeVisible();
     const link = await screen.findByRole("link", {
       name: "Baseline assembly",
     });

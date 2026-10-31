@@ -1,10 +1,21 @@
 import type { RouteObject } from "react-router";
-import { StudiesPage } from "./StudiesPage";
-import { StudyDetail } from "./StudyDetail";
-import { StudyEditor } from "./StudyEditor";
+
+// Feature areas load lazily, each its own chunk (docs/UI.md P7).
 
 export const studyRoutes: RouteObject[] = [
-  { path: "studies", element: <StudiesPage /> },
-  { path: "studies/new", element: <StudyEditor /> },
-  { path: "studies/:studyId", element: <StudyDetail /> },
+  {
+    path: "studies",
+    lazy: () =>
+      import("./StudiesPage").then((m) => ({ Component: m.StudiesPage })),
+  },
+  {
+    path: "studies/new",
+    lazy: () =>
+      import("./StudyEditor").then((m) => ({ Component: m.StudyEditor })),
+  },
+  {
+    path: "studies/:studyId",
+    lazy: () =>
+      import("./StudyDetail").then((m) => ({ Component: m.StudyDetail })),
+  },
 ];

@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../components/DialogContent";
 import type { Any } from "@bufbuild/protobuf/wkt";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
@@ -167,7 +168,7 @@ function NewEntityDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>New {label}</Dialog.Title>
           <Dialog.Description>{description}</Dialog.Description>
           <form onSubmit={submit} className="stack">
@@ -202,7 +203,7 @@ function NewEntityDialog({
               </button>
             </div>
           </form>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

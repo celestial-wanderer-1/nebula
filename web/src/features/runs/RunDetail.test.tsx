@@ -9,7 +9,7 @@ import { renderRoute } from "../../test/render";
 
 vi.mock("../../viewers/plotly/Chart", () => ({
   Chart: ({ label, data }: { label: string; data: unknown[] }) => (
-    <div role="img" aria-label={label} data-traces={data.length} />
+    <div role="figure" aria-label={label} data-traces={data.length} />
   ),
 }));
 
@@ -54,7 +54,7 @@ describe("RunDetail", () => {
     const logs = await screen.findByRole("list", { name: "Log lines" });
     await waitFor(() => expect(logs).toHaveTextContent("Started attempt 1"));
     expect(
-      await screen.findByRole("img", { name: "Convergence residuals" }),
+      await screen.findByRole("figure", { name: "Convergence residuals" }),
     ).toHaveAttribute("data-traces", "1");
 
     await userEvent.click(button("Pause"));

@@ -85,7 +85,7 @@ test("authors the inputs of a field calculation without the SDK", async ({
   await waveform.getByRole("button", { name: "Add point" }).click();
   await waveform.getByLabel("Value 2").fill("45000");
   await expect(
-    waveform.getByRole("img", { name: "Current of PF against time" }),
+    waveform.getByRole("figure", { name: "Current of PF against time" }),
   ).toBeVisible();
   await page
     .getByLabel("Add plasma targets")

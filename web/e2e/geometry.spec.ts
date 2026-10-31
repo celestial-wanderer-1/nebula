@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./test";
-import { createProject, TOKEN } from "./helpers";
+import { createProject, mock, TOKEN } from "./helpers";
 
 // EntityKind.COMPONENT; e2e tests do not import the generated code.
 const COMPONENT = 2;
@@ -94,11 +94,7 @@ test("asks what to keep when another client edits the component", async ({
   const radius = await selectPf1(page);
   // The other client saves before this edit's debounced PATCH goes out.
   await radius.fill("4.4");
-  await page.evaluate(
-    ([kind]) =>
-      window.__nebulaMock?.concurrentEdit("p-baseline", kind, "cmp-pf1"),
-    [COMPONENT],
-  );
+  await mock(page, "concurrentEdit", "p-baseline", COMPONENT, "cmp-pf1");
 
   const dialog = page.getByRole("dialog", { name: "Edited elsewhere" });
   await expect(dialog).toBeVisible();

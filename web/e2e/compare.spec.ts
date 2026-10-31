@@ -27,7 +27,7 @@ test("compares two runs in all four views", async ({ page }) => {
 
   // Overlaid profiles.
   await page.getByRole("tab", { name: "Profiles" }).click();
-  const chart = page.getByRole("img", {
+  const chart = page.getByRole("figure", {
     name: "Profiles of t1/equilibrium across runs",
   });
   await expect(chart.locator(".scatterlayer .trace")).toHaveCount(4);

@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./test";
-import { createProject, TOKEN } from "./helpers";
+import { REAL } from "./backend";
+import { createProject, mock, TOKEN } from "./helpers";
 
 const foreignExport = fileURLToPath(
   new URL("./fixtures/foreign-build.nebula", import.meta.url),
@@ -17,6 +18,8 @@ test("asks for the launch URL when opened without a token", async ({
 });
 
 test("refuses an incompatible server", async ({ page }) => {
+  // The mock bundle reads the scenario from the fragment; the stub is told.
+  if (REAL) await mock(page, "versionMismatch");
   await page.goto(`/${TOKEN}&scenario=version-mismatch`);
   await expect(
     page.getByRole("heading", { name: "Incompatible server" }),
@@ -39,7 +42,7 @@ test("creates a project from each reference concept kit and reopens it", async (
     page.getByRole("heading", { name: "E2E Simple mirror", level: 1 }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Switch project" }).click();
+  await page.getByRole("button", { name: /^Switch project/ }).click();
   await page.getByRole("menuitem", { name: "E2E Stellarator" }).click();
   await expect(
     page.getByRole("heading", { name: "E2E Stellarator", level: 1 }),

@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../components/DialogContent";
 import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { errorMessage } from "../api/errors";
@@ -78,7 +79,7 @@ export function SubmitRunDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog dialog-wide">
+        <DialogContent className="dialog dialog-wide">
           <Dialog.Title>
             {rerunOf ? `Re-run ${rerunOf}` : "Run workflow"}
           </Dialog.Title>
@@ -209,7 +210,7 @@ export function SubmitRunDialog({
               </button>
             </div>
           </form>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

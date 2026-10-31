@@ -1,19 +1,29 @@
 import { OrbitControls } from "@react-three/drei";
-import { Canvas, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState, type ElementRef } from "react";
+import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ElementRef,
+} from "react";
 import {
   BufferAttribute,
   BufferGeometry,
   DoubleSide,
+  InstancedMesh,
   Line,
   LineBasicMaterial,
   LineLoop,
+  Matrix4,
 } from "three";
 import {
   MeshTopology,
   type ComponentTessellation,
 } from "../../gen/nebula/core/v1/geometry_pb";
-import { decodeMesh } from "../../viewers/three/mesh";
+import { decodeMesh, type DecodedMesh } from "../../viewers/three/mesh";
+import { endSpan, GEOMETRY_DRAW } from "../../perf";
 import { WebGlBoundary } from "../../viewers/WebGlBoundary";
 import { meshRevisions, replicaCounts } from "./scene";
 import { DEFAULT_CAMERA, useGeometryView, type CameraState } from "./store";
@@ -96,11 +106,36 @@ function Scene({
           ),
       )}
       <Controls geometryId={geometryId} target={camera.target} />
+      <DrawnMark components={components} />
     </Canvas>
   );
 }
 
 const NO_ANGLES: readonly number[] = [];
+
+/**
+ * Ends the draw span once a frame with the arrived meshes is rendered:
+ * frame callbacks run before the render, so it waits one more.
+ */
+function DrawnMark({
+  components,
+}: {
+  components: readonly ComponentTessellation[];
+}) {
+  const shownSince = useRef(0);
+  useEffect(() => {
+    shownSince.current = performance.now();
+  }, [components]);
+  useFrame(() => {
+    const since = shownSince.current;
+    const triangles = components.reduce(
+      (n, c) => n + (c.mesh?.indices.length ?? 0) / 12,
+      0,
+    );
+    requestAnimationFrame(() => endSpan(GEOMETRY_DRAW, { triangles }, since));
+  });
+  return null;
+}
 
 /** Orbit controls; the camera is saved per geometry when a drag ends. */
 function Controls({
@@ -132,8 +167,8 @@ function Controls({
 
 /**
  * One component's mesh, plus dimmed replicas that share its BufferGeometry.
- * Each sits at the mesh origin (D156) inside a group rotated about z, so a
- * replica is the rotated original. Clicking any of them selects the
+ * Each sits at the mesh origin (D156) rotated about z, so a replica is the
+ * rotated original. Clicking any of them selects the
  * component; a drag (orbiting the camera) does not.
  */
 function ComponentObject({
@@ -170,32 +205,31 @@ function ComponentObject({
     event.stopPropagation();
     onSelect(componentId);
   };
-  const instances = [0, ...angles];
   if (decoded.topology === MeshTopology.TRIANGLES) {
     const colour = selected ? COLOURS.selected : COLOURS.surface;
     return (
       <group>
-        {instances.map((angle, index) => (
-          <group key={index} rotation={[0, 0, angle]}>
-            <mesh
-              geometry={geometry}
-              position={decoded.origin}
-              onClick={select}
-            >
-              <meshStandardMaterial
-                color={colour}
-                emissive={selected ? COLOURS.selected : "#000000"}
-                emissiveIntensity={selected ? 0.35 : 0}
-                side={DoubleSide}
-                transparent={index > 0}
-                opacity={index > 0 ? REPLICA_OPACITY : 1}
-              />
-            </mesh>
-          </group>
-        ))}
+        <mesh geometry={geometry} position={decoded.origin} onClick={select}>
+          <meshStandardMaterial
+            color={colour}
+            emissive={selected ? COLOURS.selected : "#000000"}
+            emissiveIntensity={selected ? 0.35 : 0}
+            side={DoubleSide}
+          />
+        </mesh>
+        {angles.length > 0 && (
+          <Replicas
+            geometry={geometry}
+            origin={decoded.origin}
+            angles={angles}
+            colour={colour}
+            onClick={select}
+          />
+        )}
       </group>
     );
   }
+  const instances = [0, ...angles];
   return (
     <group>
       {instances.map((angle, index) => (
@@ -211,6 +245,56 @@ function ComponentObject({
         </group>
       ))}
     </group>
+  );
+}
+
+/**
+ * The dimmed symmetry replicas of a surface as one InstancedMesh: one draw
+ * call however many copies (docs/UI.md P7). Each instance is the original
+ * at its origin (D156), rotated about z.
+ */
+function Replicas({
+  geometry,
+  origin,
+  angles,
+  colour,
+  onClick,
+}: {
+  geometry: BufferGeometry;
+  origin: DecodedMesh["origin"];
+  angles: readonly number[];
+  colour: string;
+  onClick: (event: ThreeEvent<MouseEvent>) => void;
+}) {
+  const ref = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const instanced = ref.current;
+    if (!instanced) return;
+    const placed = new Matrix4().makeTranslation(...origin);
+    angles.forEach((angle, i) =>
+      instanced.setMatrixAt(
+        i,
+        new Matrix4().makeRotationZ(angle).multiply(placed),
+      ),
+    );
+    instanced.instanceMatrix.needsUpdate = true;
+    instanced.computeBoundingSphere();
+  }, [angles, origin]);
+  return (
+    <instancedMesh
+      // A new count needs a new InstancedMesh.
+      key={angles.length}
+      ref={ref}
+      args={[geometry, undefined, angles.length]}
+      onClick={onClick}
+    >
+      <meshStandardMaterial
+        color={colour}
+        side={DoubleSide}
+        transparent
+        opacity={REPLICA_OPACITY}
+      />
+    </instancedMesh>
   );
 }
 

@@ -1,7 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-// The launch URL `nebula serve` would print; the mock accepts this token.
-export const TOKEN = "#token=mock-token";
+export { mock, TOKEN } from "./backend";
 
 export async function createProject(
   page: Page,
@@ -28,26 +27,6 @@ export const RUN_STATE = {
   FAILED: 6,
   CANCELLED: 7,
 } as const;
-
-/** Calls a scripted situation of the mock backend (src/mocks/scenarios.ts). */
-export async function mock<A extends unknown[]>(
-  page: Page,
-  name: string,
-  ...args: A
-): Promise<void> {
-  // The mock backend starts asynchronously after the page loads.
-  await page.waitForFunction(() => window.__nebulaMock !== undefined);
-  await page.evaluate(
-    ([scenario, rest]) => {
-      const scenarios = window.__nebulaMock as unknown as Record<
-        string,
-        (...a: unknown[]) => void
-      >;
-      scenarios[scenario as string]!(...(rest as unknown[]));
-    },
-    [name, args] as const,
-  );
-}
 
 /** The ID of the Run whose page opens after a submission. */
 export async function runIdOf(page: Page): Promise<string> {

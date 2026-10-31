@@ -12,7 +12,7 @@ vi.mock("../../viewers/vtk/VtkCanvas", () => ({
 }));
 vi.mock("../../viewers/plotly/Chart", () => ({
   Chart: ({ label, data }: { label: string; data: unknown[] }) => (
-    <div role="img" aria-label={label} data-traces={data.length} />
+    <div role="figure" aria-label={label} data-traces={data.length} />
   ),
 }));
 
@@ -84,7 +84,7 @@ describe("RunResults (docs/UI.md 6.7)", () => {
 
   it("switches viewers and slices time series (D146)", async () => {
     open("transport/profiles");
-    const chart = await screen.findByRole("img", {
+    const chart = await screen.findByRole("figure", {
       name: "transport · profiles",
     });
     expect(chart).toHaveAttribute("data-traces", "2");

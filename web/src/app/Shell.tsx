@@ -11,9 +11,11 @@ function ProjectSwitcher() {
   const navigate = useNavigate();
   const current = projects.data?.find((project) => project.id === projectId);
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="switcher" aria-label="Switch project">
-        {current?.name ?? "Projects"} ▾
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger className="switcher">
+        <span className="visually-hidden">Switch project: </span>
+        {current?.name ?? "Projects"}
+        <span aria-hidden> ▾</span>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="menu" align="start" sideOffset={4}>
@@ -75,7 +77,7 @@ export function PluginStatus() {
   if (!plugins.data) return null;
   return (
     <Link
-      to="/plugins"
+      to="/admin/plugins"
       className={failing.length ? "indicator warn" : "indicator"}
       title={failing.map((p) => `${p.id} ${p.version}`).join(", ") || undefined}
     >
@@ -90,9 +92,31 @@ export function PluginStatus() {
   );
 }
 
+/** First in the tab order: jumps past the top bar and navigation. */
+function SkipLink() {
+  return (
+    <a
+      href="#main"
+      className="skip-link"
+      onClick={(event) => {
+        // The page's main landmark, whichever route renders it; the URL
+        // fragment stays untouched.
+        event.preventDefault();
+        const main = document.querySelector("main");
+        if (!main) return;
+        main.tabIndex = -1;
+        main.focus();
+      }}
+    >
+      Skip to content
+    </a>
+  );
+}
+
 export function Shell() {
   return (
     <div className="shell">
+      <SkipLink />
       <header className="topbar">
         <Link to="/" className="brand">
           Nebula
@@ -101,7 +125,7 @@ export function Shell() {
         <div className="spacer" />
         <QueueIndicator />
         <PluginStatus />
-        <Link to="/settings" className="indicator">
+        <Link to="/admin/settings" className="indicator">
           Settings
         </Link>
       </header>

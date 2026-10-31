@@ -45,7 +45,7 @@ for (const [output, viewer, title] of [
 ] as const) {
   test(`renders the ${viewer} viewer with Plotly`, async ({ page }) => {
     await open(page, output);
-    const chart = page.getByRole("img", { name: title });
+    const chart = page.getByRole("figure", { name: title });
     await expect(chart.locator(".main-svg").first()).toBeVisible();
     await expect(
       chart.locator(".scatterlayer .trace, .barlayer .trace"),
@@ -58,7 +58,7 @@ test("renders the time trace and slices a time series (D146)", async ({
 }) => {
   await open(page, "transport/profiles");
   await page.getByRole("button", { name: "Time trace" }).click();
-  const chart = page.getByRole("img", { name: "transport · profiles" });
+  const chart = page.getByRole("figure", { name: "transport · profiles" });
   await expect(chart.locator(".scatterlayer .trace")).toHaveCount(2);
   await page.getByLabel("Time slice").fill("6");
   await expect(page.getByText("t = 3 s (7 of 10")).toBeVisible();

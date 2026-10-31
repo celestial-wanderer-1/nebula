@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../components/DialogContent";
 import type { EntityDraft } from "../gen/nebula/core/v1/entity_pb";
 
 /**
@@ -16,7 +17,7 @@ export function ConflictDialog({
     <Dialog.Root open={Boolean(conflict)}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content
+        <DialogContent
           className="dialog"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
@@ -39,7 +40,7 @@ export function ConflictDialog({
               Re-apply my change
             </button>
           </div>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

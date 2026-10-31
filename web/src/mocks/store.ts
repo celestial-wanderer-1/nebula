@@ -99,10 +99,14 @@ import {
   type InputRecord,
 } from "./setupFixtures";
 import { conceptTraits } from "./extensions";
-import { MockClock } from "./clock";
+import { MockClock, type ClockMode } from "./clock";
 import type { RunEngine } from "./runs/engine";
 import { ENGINE_BUILD, startEngine } from "./runs/service";
-import { checkGeometry, tessellateShape } from "./tessellate";
+import {
+  checkGeometry,
+  setTessellationDetail,
+  tessellateShape,
+} from "./tessellate";
 import { ComparisonService } from "./comparisons";
 import { StorageService } from "./storage";
 import { StudyService } from "./studies";
@@ -197,6 +201,7 @@ export class MockStore {
   private readonly entityListeners = new Set<(change: EntityChange) => void>();
   /** Drives scripted Runs; manual in unit tests (docs/UI.md Section 7). */
   readonly clock: MockClock;
+  private readonly initialClockMode: ClockMode;
   engine!: RunEngine;
   /** View jobs and their payload cache (A§3.6). */
   readonly views = new ViewService(this);
@@ -211,6 +216,7 @@ export class MockStore {
 
   constructor(apiVersion: string, clock = new MockClock({ mode: "manual" })) {
     this.clock = clock;
+    this.initialClockMode = clock.mode;
     this.reset(apiVersion);
   }
 
@@ -242,6 +248,10 @@ export class MockStore {
     this.gpuModel = "MI300X";
     this.engine?.stop();
     this.clock.cancelAll();
+    // Scenarios may have changed the clock; a reset restores it.
+    this.clock.setMode(this.initialClockMode ?? this.clock.mode);
+    this.clock.setScale(1);
+    setTessellationDetail(1);
     this.engine = startEngine(this, runFixtures(), outputFixtures());
     this.views?.clear();
     this.comparisons?.clear();

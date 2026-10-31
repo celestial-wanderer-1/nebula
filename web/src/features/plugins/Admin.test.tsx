@@ -6,7 +6,7 @@ import { renderRoute } from "../../test/render";
 
 describe("Plugins and settings (docs/UI.md 6.10)", () => {
   it("lists manifests with ABI, .so hash and smoke results per GPU model", async () => {
-    renderRoute("/plugins");
+    renderRoute("/admin/plugins");
     const acme = await screen.findByRole("region", { name: "acme.demo 1.2.0" });
     expect(acme).toHaveTextContent(
       "clang 19.1, libstdc++ 14, ROCm 7.1, Nebula ABI 1",
@@ -25,7 +25,7 @@ describe("Plugins and settings (docs/UI.md 6.10)", () => {
   });
 
   it("shows the configuration read-only and switches a project's strict cache", async () => {
-    renderRoute("/settings");
+    renderRoute("/admin/settings");
     const file = await screen.findByLabelText("Configuration file");
     await waitFor(() => expect(file).toHaveTextContent("[gpus]"));
     const toggle = await screen.findByRole("switch", {

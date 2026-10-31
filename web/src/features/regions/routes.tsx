@@ -1,8 +1,16 @@
 import type { RouteObject } from "react-router";
-import { RegionEditor } from "./RegionEditor";
-import { RegionList } from "./RegionList";
+
+// Feature areas load lazily, each its own chunk (docs/UI.md P7).
 
 export const regionRoutes: RouteObject[] = [
-  { path: "regions", element: <RegionList /> },
-  { path: "regions/:regionId", element: <RegionEditor /> },
+  {
+    path: "regions",
+    lazy: () =>
+      import("./RegionList").then((m) => ({ Component: m.RegionList })),
+  },
+  {
+    path: "regions/:regionId",
+    lazy: () =>
+      import("./RegionEditor").then((m) => ({ Component: m.RegionEditor })),
+  },
 ];

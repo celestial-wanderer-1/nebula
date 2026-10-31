@@ -14,6 +14,7 @@ import { apiBlob, apiJson } from "./client";
 import { saveDownload } from "./download";
 import { entityPath, useEntities } from "./entities";
 import { queryKeys } from "./queryKeys";
+import { GEOMETRY_DRAW, spanReceived, startSpan } from "../perf";
 
 const geometryPath = (projectId: string, geometryId: string) =>
   entityPath(projectId, EntityKind.GEOMETRY, geometryId);
@@ -151,7 +152,13 @@ export function useGeometryTessellation(
 ) {
   const query = useQuery({
     queryKey: queryKeys.tessellation(projectId, geometryId, fingerprint ?? ""),
-    queryFn: ({ signal }) => fetchTessellation(projectId, geometryId, signal),
+    queryFn: ({ signal }) => {
+      startSpan(GEOMETRY_DRAW);
+      return fetchTessellation(projectId, geometryId, signal).then((data) => {
+        spanReceived(GEOMETRY_DRAW);
+        return data;
+      });
+    },
     enabled: fingerprint !== undefined,
     // keepPreviousData, but never across geometries.
     placeholderData: (previous, previousQuery) =>

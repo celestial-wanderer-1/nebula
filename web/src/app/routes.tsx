@@ -56,8 +56,9 @@ export const routes: RouteObject[] = [
           { path: "*", element: <NotFound main={false} /> },
         ],
       },
-      { path: "/plugins", element: <PluginsPage /> },
-      { path: "/settings", element: <SettingsPage /> },
+      // Install-wide pages; /plugins and /settings are the API's (A§13.2).
+      { path: "/admin/plugins", element: <PluginsPage /> },
+      { path: "/admin/settings", element: <SettingsPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

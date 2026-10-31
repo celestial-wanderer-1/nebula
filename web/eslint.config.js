@@ -8,6 +8,7 @@ import tseslint from "typescript-eslint";
 export default defineConfig(
   globalIgnores([
     "dist/**",
+    "stub-server/dist/**",
     "src/gen/**",
     "src/mocks/fixtures/acme-demo.ts",
     "public/mockServiceWorker.js",
@@ -17,7 +18,12 @@ export default defineConfig(
   ]),
   js.configs.recommended,
   {
-    files: ["**/*.{js,mjs}", "*.config.ts", "e2e/**/*.ts"],
+    files: [
+      "**/*.{js,mjs}",
+      "*.config.ts",
+      "e2e/**/*.ts",
+      "stub-server/**/*.ts",
+    ],
     languageOptions: { globals: globals.node },
   },
   {

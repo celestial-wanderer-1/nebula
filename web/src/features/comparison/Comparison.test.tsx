@@ -26,7 +26,7 @@ vi.mock("../../viewers/vtk/VtkCanvas", () => ({
 vi.mock("../../viewers/plotly/Chart", () => ({
   Chart: ({ label, data }: { label: string; data: { name: string }[] }) => (
     <div
-      role="img"
+      role="figure"
       aria-label={label}
       data-traces={data.map((d) => d.name).join("|")}
     />
@@ -81,7 +81,7 @@ describe("Comparison (docs/UI.md 6.8)", () => {
   it("overlays the Runs' profiles in one chart", async () => {
     await compare();
     await userEvent.click(await screen.findByRole("tab", { name: "Profiles" }));
-    const chart = await screen.findByRole("img", {
+    const chart = await screen.findByRole("figure", {
       name: "Profiles of t1/equilibrium across runs",
     });
     await waitFor(() =>

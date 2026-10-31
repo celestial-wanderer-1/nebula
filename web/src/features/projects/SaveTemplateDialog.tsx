@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../../components/DialogContent";
 import { useId, useState, type FormEvent } from "react";
 import { useSaveTemplate } from "../../api/projects";
 import type { Project } from "../../gen/nebula/core/v1/project_pb";
@@ -39,7 +40,7 @@ export function SaveTemplateDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>Save “{project?.name}” as a template</Dialog.Title>
           <Dialog.Description>
             New projects can start from this template.
@@ -76,7 +77,7 @@ export function SaveTemplateDialog({
               </button>
             </div>
           </form>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

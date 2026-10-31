@@ -12,7 +12,7 @@ interface Pending {
 export type ClockMode = "auto" | "manual";
 
 export class MockClock {
-  private mode: ClockMode;
+  mode: ClockMode;
   /** Real milliseconds per mock millisecond. */
   private scale: number;
   private time: number;

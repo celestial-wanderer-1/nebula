@@ -25,6 +25,7 @@ import {
   TemplateSchema,
 } from "../../gen/nebula/core/v1/project_pb";
 import { VersionInfoSchema } from "../../gen/nebula/core/v1/version_pb";
+import { isApiPath } from "../../api/paths";
 import { downloadName } from "../store";
 import { store } from "../state";
 import { MOCK_BUILD_ID } from "../token";
@@ -44,14 +45,14 @@ import {
   unauthorized,
 } from "./util";
 
-// Paths the server owns; anything else (the bundle, assets) passes through.
-const API_PATH =
-  /^\/(version|projects|templates|plugins|queue|settings|library)(\/|$)/;
-
 export const restHandlers = [
   http.all("*", ({ request }) => {
+    // Paths the server owns; anything else (the bundle, assets) passes
+    // through. In Node (the stub server) every request is the server's.
     const url = new URL(request.url);
-    if (url.origin !== location.origin || !API_PATH.test(url.pathname)) return;
+    const sameOrigin =
+      typeof location === "undefined" || url.origin === location.origin;
+    if (!sameOrigin || !isApiPath(url.pathname)) return;
     return unauthorized(request);
   }),
 

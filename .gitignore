@@ -1,5 +1,6 @@
 node_modules/
 web/dist/
+web/stub-server/dist/
 web/src/gen/
 web/src/mocks/fixtures/*.binpb
 web/test-results/

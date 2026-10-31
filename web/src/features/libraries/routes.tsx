@@ -1,20 +1,37 @@
 import type { RouteObject } from "react-router";
-import { ComponentDetail } from "./ComponentDetail";
-import { GlobalComponentEntry, GlobalMaterialEntry } from "./GlobalEntry";
-import { LibrariesPage } from "./LibrariesPage";
-import { MaterialDetail } from "./MaterialDetail";
 
-// Libraries area (docs/UI.md Section 6.2), relative to /p/:projectId.
+// Libraries area (docs/UI.md Section 6.2), relative to /p/:projectId,
+// loaded lazily (docs/UI.md P7).
 export const libraryRoutes: RouteObject[] = [
-  { path: "libraries", element: <LibrariesPage /> },
-  { path: "libraries/components/:componentId", element: <ComponentDetail /> },
-  { path: "libraries/materials/:materialId", element: <MaterialDetail /> },
+  {
+    path: "libraries",
+    lazy: () =>
+      import("./LibrariesPage").then((m) => ({ Component: m.LibrariesPage })),
+  },
+  {
+    path: "libraries/components/:componentId",
+    lazy: () =>
+      import("./ComponentDetail").then((m) => ({
+        Component: m.ComponentDetail,
+      })),
+  },
+  {
+    path: "libraries/materials/:materialId",
+    lazy: () =>
+      import("./MaterialDetail").then((m) => ({ Component: m.MaterialDetail })),
+  },
   {
     path: "libraries/global/components/:entryId",
-    element: <GlobalComponentEntry />,
+    lazy: () =>
+      import("./GlobalEntry").then((m) => ({
+        Component: m.GlobalComponentEntry,
+      })),
   },
   {
     path: "libraries/global/materials/:entryId",
-    element: <GlobalMaterialEntry />,
+    lazy: () =>
+      import("./GlobalEntry").then((m) => ({
+        Component: m.GlobalMaterialEntry,
+      })),
   },
 ];

@@ -64,7 +64,9 @@ function PortHandle({
         type={kind}
         id={port.name}
         position={kind === "target" ? Position.Left : Position.Right}
-        aria-label={`${kind === "target" ? "Input" : "Output"} ${port.name}: ${type}`}
+        // Pointer only: the port's name and type are the text beside it,
+        // and the panel's connect form is the keyboard route.
+        aria-hidden
         title={type}
       />
       <span className="port-name">{port.name}</span>

@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../../components/DialogContent";
 import type { Extension } from "../../gen/nebula/core/v1/plugin_pb";
 
 /**
@@ -22,7 +23,7 @@ export function AdapterOffer({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>Insert an adapter</Dialog.Title>
           <Dialog.Description>
             {offer?.message}. Connect them through an adapter:
@@ -46,7 +47,7 @@ export function AdapterOffer({
               <button type="button">Cancel</button>
             </Dialog.Close>
           </div>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

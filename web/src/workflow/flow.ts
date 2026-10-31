@@ -42,10 +42,12 @@ export interface CanvasNode {
   data: CanvasNodeData;
   style?: { width: number; height: number };
   selected?: boolean;
+  ariaLabel: string;
 }
 
 export interface CanvasEdge {
   id: string;
+  ariaLabel: string;
   source: string;
   sourceHandle: string;
   target: string;
@@ -110,9 +112,12 @@ export function toCanvasNodes(
       if (nodeId === node.id && port) portIssues.set(port, list);
     }
     const group = isGroup(node);
+    const kindLabel = KIND_LABELS[node.kind.case ?? "solver"];
     return {
       id: node.id,
       type: group ? "group" : "step",
+      // Screen readers name nodes, not just their IDs (docs/UI.md P7).
+      ariaLabel: `${kindLabel} ${node.label || node.id}`,
       position: { x: node.layout?.x ?? 0, y: node.layout?.y ?? 0 },
       ...(node.parentId && ids.has(node.parentId)
         ? { parentId: node.parentId, extent: "parent" as const }
@@ -122,7 +127,7 @@ export function toCanvasNodes(
       data: {
         node,
         ports,
-        kindLabel: KIND_LABELS[node.kind.case ?? "solver"],
+        kindLabel,
         issues: issues.nodes.get(node.id) ?? [],
         portIssues,
       },
@@ -148,8 +153,12 @@ export function toCanvasEdges(
     const label = port?.type.timeSeries
       ? `time series: ${port.type.timeBase || "slices"}`
       : undefined;
+    const target = byId.get(edge.to?.nodeId ?? "");
+    const end = (node: typeof source, port = "") =>
+      `${node?.label || node?.id || "?"} ${port}`;
     return {
       id: edge.id,
+      ariaLabel: `${end(source, edge.from?.port)} to ${end(target, edge.to?.port)}${found.length ? " (has issues)" : ""}`,
       source: edge.from?.nodeId ?? "",
       sourceHandle: edge.from?.port ?? "",
       target: edge.to?.nodeId ?? "",

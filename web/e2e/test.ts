@@ -1,11 +1,13 @@
 import { expect, test as base } from "@playwright/test";
+import { resetBackend } from "./backend";
 
-// Every e2e test fails on an uncaught page error or a Content Security
-// Policy violation: the bundle must run under the production CSP (D117,
-// docs/UI.md P7).
+// Every e2e test starts from the fixtures, and fails on an uncaught page
+// error or a Content Security Policy violation: the bundle must run under
+// the production CSP (D117, docs/UI.md P7).
 export const test = base.extend<{ guard: void }>({
   guard: [
-    async ({ page }, use) => {
+    async ({ page, request }, use) => {
+      await resetBackend(request);
       const problems: string[] = [];
       page.on("pageerror", (error) =>
         problems.push(`page error: ${error.message}`),

@@ -66,7 +66,7 @@ describe("Libraries", () => {
   it("imports a global component with a copy of its material and links its source (D88)", async () => {
     const { router } = renderRoute(`${base}?tab=global-components`);
     expect(
-      screen.getByRole("tab", { name: "Global components" }),
+      await screen.findByRole("tab", { name: "Global components" }),
     ).toHaveAttribute("aria-selected", "true");
     await userEvent.click(
       await screen.findByRole("button", { name: "Import PF coil (generic)" }),
@@ -106,8 +106,11 @@ describe("Libraries", () => {
     );
 
     await userEvent.click(sourceLink);
-    expect(router.state.location.pathname).toBe(
-      `${base}/global/components/lib-cmp-pf-coil`,
+    // The library entry's route loads lazily before navigation completes.
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `${base}/global/components/lib-cmp-pf-coil`,
+      ),
     );
     expect(
       await screen.findByRole("heading", {

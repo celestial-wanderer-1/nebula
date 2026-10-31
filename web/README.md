@@ -15,8 +15,9 @@ missing Chromium system libraries, use `pnpm --dir web exec playwright install-d
 Build, development, typecheck, unit-test, and browser-test commands generate the
 protobuf types and plugin fixture first. `make test` runs typecheck, lint,
 format check, Vitest and Playwright. Vitest runs unit and component tests under
-`src/`; Playwright runs `e2e/` tests against a freshly built mock bundle on
-port 4173.
+`src/` and `stub-server/`; Playwright runs `e2e/` tests twice, against a
+freshly built mock bundle on port 4173 and against the production bundle on
+the stub server on port 4174 (see [Stub server](#stub-server)).
 
 ## Mock backend and dev modes
 
@@ -188,16 +189,6 @@ These implementation details are what the FastAPI server must match:
   `SCALARS` output carries its values inline in `scalars` (an `Any`). Time
   series carry their `time` axis, and `ViewParams.time_index` picks a slice.
 
-## Bundles
-
-Heavy views load lazily through `src/viewers/lazy.tsx`, so each library is
-a separate chunk fetched only where it is used: three.js and React Three
-Fiber with the geometry viewport and the region placement view, React Flow
-with the workflow canvas, vtk.js with the 2D contour, 3D field, Poincaré
-and mode-structure viewers, and Plotly (its basic bundle, without the WebGL
-traces) with charts. Headless Playwright runs draw WebGL views with software
-WebGL (SwiftShader; see `playwright.config.ts`).
-
 - `POST /projects/{p}/comparisons` takes a `CreateComparisonRequest` (Run
   IDs of the project and a shared Region) and returns 201 with the
   `Comparison`: scalar rows across the Runs, each with its declared
@@ -234,6 +225,29 @@ WebGL (SwiftShader; see `playwright.config.ts`).
 - `GET /settings` returns the read-only `Settings` (the TOML file).
   `PUT /projects/{p}/settings` takes `ProjectSettings` and returns the
   `Project`.
+- Mock builds add `largeGeometry(factor = 8)`, meshes `factor` times finer
+  in each direction (about 500k triangles for the baseline geometry), for
+  the performance checks.
+
+## Bundles
+
+Feature areas load lazily through React Router's `lazy`, one chunk each, and
+heavy views load lazily through `src/viewers/lazy.tsx`, so each library is
+a separate chunk fetched only where it is used: three.js and React Three
+Fiber with the geometry viewport and the region placement view, React Flow
+with the workflow canvas, vtk.js with the 2D contour, 3D field, Poincaré
+and mode-structure viewers, and Plotly (its basic bundle, without the WebGL
+traces) with charts. Headless Playwright runs draw WebGL views with software
+WebGL (SwiftShader; see `playwright.config.ts`).
+
+`pnpm run build` ends with `scripts/check-bundle.mjs`, which reads the chunk
+graph the build writes (`dist/.vite/chunks.json`) and fails when:
+
+- the entry chunk's static imports reach three.js, React Three Fiber,
+  vtk.js, Plotly or React Flow;
+- any chunk contains the mock backend or MSW;
+- any script contains `eval(` or `new Function(`, which the CSP forbids;
+- `mockServiceWorker.js` ships.
 
 ## Content Security Policy
 
@@ -244,22 +258,96 @@ The server must replace the placeholder with a fresh random nonce per
 response and send it in its policy. The app passes the nonce to the
 libraries that insert `<style>` elements (Radix's scroll lock). Plotly
 inserts one empty `<style>` element and fills it through the CSSOM; the
-hash of the empty string admits only that. `vite preview` sends this policy
-with the placeholder as the nonce; Playwright fails any test that triggers a
-violation (`e2e/test.ts`):
+hash of the empty string admits only that. The production bundle needs no
+workers, so `worker-src` stays at `'none'`:
 
 ```text
 default-src 'none'; script-src 'self';
 style-src 'self' 'nonce-<nonce>' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
-img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws: wss:;
-worker-src 'self' blob:; manifest-src 'self'; base-uri 'none';
-form-action 'none'; frame-ancestors 'none'; object-src 'none'
+img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws://<host>;
+manifest-src 'self'; base-uri 'none'; form-action 'none';
+frame-ancestors 'none'; object-src 'none'
 ```
 
-## Static serving contract
+The stub server sends this policy with a fresh nonce. Mock-mode `vite
+preview` sends it with the placeholder as the nonce, plus `worker-src` for
+MSW's service worker. Playwright fails any test, in either mode, that
+triggers a violation or an uncaught page error (`e2e/test.ts`).
 
-The production build writes `web/dist/`. The FastAPI server should serve its
-`assets/` directory as static files and serve `index.html` for browser routes
-such as `/p/{projectId}/workflows`. API and WebSocket routes must retain their
-own handlers and must not use the HTML fallback. Keep `index.html` revalidated;
-the content-hashed files under `assets/` may be cached as immutable.
+## Serving and security contract
+
+What `nebula serve` must do in front of the bundle (A§16.1, D90, D117,
+D137). The stub server (below) implements it, and `e2e/security.spec.ts`
+checks it.
+
+- Bind `127.0.0.1` only, and print the launch URL with a per-launch token in
+  the fragment: `http://127.0.0.1:<port>/#token=<token>`.
+- Refuse, with 403, any request whose `Host` is not `127.0.0.1:<port>` or
+  `localhost:<port>` (DNS rebinding), and any request, WebSocket upgrades
+  included, whose `Origin` is present and not the server's own.
+- Require `Authorization: Bearer <token>` on every API request (401 JSON
+  `ApiError` otherwise; a token in the query string does not count), and the
+  `nebula.token.<token>` subprotocol on every WebSocket (close code 4401
+  otherwise). Echo only the `nebula.v1` subprotocol, never the token.
+- Serve `web/dist/`: `index.html` with `Cache-Control: no-cache` and a fresh
+  nonce, the content-hashed files under `assets/` as immutable, and
+  `index.html` for browser routes such as `/p/{projectId}/workflows`. API
+  paths (`src/api/paths.ts`), `/ws/` paths and missing assets never fall
+  back to HTML: an unknown API path is a JSON 404.
+- Send on every response: the policy above, `X-Content-Type-Options:
+nosniff`, `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`; API
+  responses also `Cache-Control: no-store`.
+
+## Stub server
+
+`web/stub-server/` stands in for `nebula serve` until it exists: a Node
+server that serves the production `dist/` under the contract above, with
+the API and WebSocket channels answered by the mock backend's handlers
+(`src/mocks/`). It is a test tool, never shipped.
+
+```sh
+pnpm --dir web run stub            # builds both, then serves on port 4174
+node web/stub-server/dist/main.mjs --port 4174 --dist web/dist
+```
+
+The token is random per launch, or `NEBULA_STUB_TOKEN`. Tests control the
+backend through `POST /__stub/reset` and `POST /__stub/scenario` (body
+`{"name", "args"}`, names from `src/mocks/scenarios.ts`), which take the
+token like the API. These `/__stub/` endpoints are not part of the API
+contract.
+
+`make test` runs the Playwright suite twice: `mock` against the mock bundle
+under `vite preview`, and `real` (`pnpm run e2e:real`, `E2E_TARGET=real`)
+against the production bundle on the stub server, one test at a time with a
+reset before each. `e2e/backend.ts` hides the difference.
+`security.spec.ts` runs in `real` only.
+
+## Accessibility
+
+`e2e/a11y.spec.ts` runs axe (WCAG 2.0 and 2.1, A and AA) on every area,
+dialog and viewer, and checks the keyboard flows: the skip link, area
+navigation, dialogs that trap and return focus, and building a workflow
+with the palette and the connect form, the keyboard route for wiring that
+the canvas offers by dragging. Plotly charts are figures, not images, since
+their mode bar is interactive; each has a "Show data" table.
+
+## Performance baselines
+
+Provisional (D161), from `e2e/perf.spec.ts` on a development machine with
+headless Chromium and software WebGL; the spec's bounds are loose sanity
+checks, not targets. Times run from data requested or received
+(`src/perf.ts` spans, in the browser's performance timeline) to the first
+drawn frame.
+
+| Case                                               | Mock   | Stub   |
+| -------------------------------------------------- | ------ | ------ |
+| Geometry, 524,288 triangles, request to drawn      | 0.34 s | 0.87 s |
+| Selecting a component with that geometry shown     | 47 ms  | 46 ms  |
+| vtk.js slice, 1M points, payload to drawn          | 2.2 s  | 2.5 s  |
+| Plotly profiles, 2 × 100k points, payload to drawn | 63 ms  | 107 ms |
+
+In mock mode the mock backend tessellates in the page; against the stub the
+geometry time includes building and transferring a 12.6 MB tessellation.
+Plotly simplifies dense lines as it draws them, which keeps large profiles
+cheap. Symmetry replicas of a surface are one `InstancedMesh`, and mesh and
+polydata arrays decode with one copy each.

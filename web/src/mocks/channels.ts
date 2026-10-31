@@ -11,7 +11,7 @@ import {
 import { WS_CLOSE_UNAUTHORIZED, WS_TOKEN_PREFIX } from "../ws/manager";
 import { mockSchema } from "./fixtures";
 import { store } from "./state";
-import { MOCK_TOKEN } from "./token";
+import { acceptedToken } from "./token";
 
 // The mock's WebSocket channels (A§13.2), independent of the transport:
 // MSW links them in the browser and in Vitest (ws.ts).
@@ -38,7 +38,7 @@ export function authorize(
   client: ChannelClient,
   protocols: readonly string[],
 ): boolean {
-  if (protocols.includes(`${WS_TOKEN_PREFIX}${MOCK_TOKEN}`)) return true;
+  if (protocols.includes(`${WS_TOKEN_PREFIX}${acceptedToken()}`)) return true;
   client.close(WS_CLOSE_UNAUTHORIZED, "Missing or invalid token");
   return false;
 }

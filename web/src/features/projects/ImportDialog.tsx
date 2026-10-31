@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../../components/DialogContent";
 import { useId, useState, type FormEvent } from "react";
 import { useImportProject } from "../../api/projects";
 import { IssueSeverity } from "../../gen/nebula/core/v1/project_pb";
@@ -34,7 +35,7 @@ export function ImportDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>Import project</Dialog.Title>
           <Dialog.Description>
             Imported projects are checked before they are added (D139).
@@ -103,7 +104,7 @@ export function ImportDialog({
               </div>
             </form>
           )}
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

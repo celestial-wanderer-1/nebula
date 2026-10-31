@@ -1,5 +1,6 @@
 import type { ViewPayload, VtkPolyData } from "../gen/nebula/core/v1/view_pb";
 import { parseGlb } from "./gltf";
+import { float32s, uint32s } from "./binary";
 
 // Decoding of vtk.js payloads (view.proto): float32 points relative to the
 // payload origin and VTK cell arrays. Free of vtk.js, so it tests without
@@ -31,19 +32,9 @@ export interface DecodedScene {
 }
 
 /** Reads little-endian float32 values from bytes at any offset. */
-export function readF32(bytes: Uint8Array): Float32Array {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const out = new Float32Array(Math.floor(bytes.byteLength / 4));
-  for (let i = 0; i < out.length; i++) out[i] = view.getFloat32(i * 4, true);
-  return out;
-}
+export const readF32 = (bytes: Uint8Array): Float32Array => float32s(bytes);
 
-export function readU32(bytes: Uint8Array): Uint32Array {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const out = new Uint32Array(Math.floor(bytes.byteLength / 4));
-  for (let i = 0; i < out.length; i++) out[i] = view.getUint32(i * 4, true);
-  return out;
-}
+export const readU32 = (bytes: Uint8Array): Uint32Array => uint32s(bytes);
 
 const cellsOrUndefined = (bytes: Uint8Array) =>
   bytes.byteLength ? readU32(bytes) : undefined;

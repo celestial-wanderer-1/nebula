@@ -1,4 +1,6 @@
+import { create } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
+import { ValidationIssueSchema } from "../gen/nebula/core/v1/project_pb";
 import { pluginFixtures } from "../mocks/fixtures";
 import { workflowTemplateFixtures } from "../mocks/setupFixtures";
 import { toCanvasEdges, toCanvasNodes } from "./flow";
@@ -31,5 +33,26 @@ describe("canvas mapping", () => {
       animated: true,
     });
     expect(edges.find((e) => e.id === "e-1")?.label).toBeUndefined();
+  });
+
+  it("names nodes and edges for screen readers", () => {
+    const nodes = toCanvasNodes(transport, extensions, indexIssues([]));
+    const stability = nodes.find((n) => n.id === "stability")!;
+    expect(stability.ariaLabel).toBe(
+      `${stability.data.kindLabel} ${stability.data.node.label || "stability"}`,
+    );
+    const edges = toCanvasEdges(
+      transport,
+      extensions,
+      indexIssues([
+        create(ValidationIssueSchema, { path: "edges/e-1", message: "bad" }),
+      ]),
+    );
+    expect(edges.find((e) => e.id === "e-1")?.ariaLabel).toMatch(
+      / to .*\(has issues\)$/,
+    );
+    expect(edges.find((e) => e.id === "e-2")?.ariaLabel).not.toContain(
+      "issues",
+    );
   });
 });

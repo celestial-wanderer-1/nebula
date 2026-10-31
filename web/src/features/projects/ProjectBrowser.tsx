@@ -103,7 +103,7 @@ export function ProjectBrowser() {
                     </button>
                     <button
                       type="button"
-                      aria-label={`Save ${project.name} as template`}
+                      aria-label={`Save as template ${project.name}`}
                       onClick={() => setTemplateFrom(project)}
                     >
                       Save as template

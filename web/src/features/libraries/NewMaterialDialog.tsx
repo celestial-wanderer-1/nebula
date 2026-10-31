@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../../components/DialogContent";
 import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { ValidationError } from "../../api/errors";
@@ -49,7 +50,7 @@ export function NewMaterialDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>New material</Dialog.Title>
           <Dialog.Description>
             A project material. Set its properties after creating it.
@@ -86,7 +87,7 @@ export function NewMaterialDialog({
               </button>
             </div>
           </form>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

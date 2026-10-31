@@ -40,3 +40,20 @@ describe("scenarios.concurrentEdit", () => {
     expect(shape.width).toBeCloseTo(0.5, 9);
   });
 });
+
+describe("scenarios.largeGeometry", () => {
+  const triangles = () =>
+    store
+      .tessellation("p-baseline", "geo-main")!
+      .components.reduce((sum, c) => sum + (c.mesh?.indices.length ?? 0), 0) /
+    12;
+
+  it("refines meshes to about 500k triangles until a reset", () => {
+    const base = triangles();
+    scenarios.largeGeometry();
+    expect(triangles()).toBe(base * 64);
+    expect(triangles()).toBeGreaterThan(500_000);
+    store.reset(store.apiVersion);
+    expect(triangles()).toBe(base);
+  });
+});

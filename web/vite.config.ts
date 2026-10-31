@@ -2,20 +2,10 @@ import react from "@vitejs/plugin-react";
 import type { ProxyOptions, Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import pkg from "./package.json" with { type: "json" };
+import { API_PREFIXES } from "./src/api/paths";
 
 // Token the mock backend accepts (src/mocks/token.ts).
 const MOCK_TOKEN = "mock-token";
-
-// Paths the FastAPI server owns (A§13.2); everything else is the UI bundle.
-const API_PREFIXES = [
-  "/version",
-  "/projects",
-  "/templates",
-  "/plugins",
-  "/queue",
-  "/settings",
-  "/library",
-];
 
 // Prints the mock launch URL the way `nebula serve` prints the real one (D137).
 function printMockUrl(): Plugin {
@@ -30,6 +20,35 @@ function printMockUrl(): Plugin {
           server.config.logger.info(`  ➜  Mock UI: ${url}#token=${MOCK_TOKEN}`);
         }
       };
+    },
+  };
+}
+
+// Writes the chunk graph of a production build for scripts/check-bundle.mjs:
+// which chunks are entries, what they import, and their modules.
+function chunkGraph(): Plugin {
+  return {
+    name: "nebula-chunk-graph",
+    apply: "build",
+    generateBundle(_, bundle) {
+      const chunks = Object.values(bundle).flatMap((item) =>
+        item.type === "chunk"
+          ? [
+              {
+                file: item.fileName,
+                isEntry: item.isEntry,
+                imports: item.imports,
+                dynamicImports: item.dynamicImports,
+                modules: Object.keys(item.modules),
+              },
+            ]
+          : [],
+      );
+      this.emitFile({
+        type: "asset",
+        fileName: ".vite/chunks.json",
+        source: JSON.stringify(chunks, null, 1),
+      });
     },
   };
 }
@@ -76,12 +95,16 @@ export default defineConfig(({ mode }) => {
   const useMock =
     mode === "mock" || mode === "test" || (mode === "development" && !target);
   return {
-    plugins: [react(), ...(useMock ? [printMockUrl()] : [])],
+    plugins: [react(), chunkGraph(), ...(useMock ? [printMockUrl()] : [])],
     // public/ holds only the MSW worker; production bundles must not ship it.
     publicDir: useMock ? "public" : false,
     define: {
       __NEBULA_MOCK__: JSON.stringify(useMock),
       __NEBULA_BUILD__: JSON.stringify(`${pkg.version}+${mode}`),
+    },
+    build: {
+      // The large chunks are the viewer libraries, each loaded lazily.
+      chunkSizeWarningLimit: 1300,
     },
     preview: {
       headers: {
@@ -102,7 +125,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
-      include: ["src/**/*.{test,spec}.{ts,tsx}"],
+      include: ["src/**/*.{test,spec}.{ts,tsx}", "stub-server/**/*.test.ts"],
       clearMocks: true,
     },
   };

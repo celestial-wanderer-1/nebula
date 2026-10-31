@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../../components/DialogContent";
 import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { ValidationError } from "../../api/errors";
@@ -58,7 +59,7 @@ export function CreateProjectDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>New project</Dialog.Title>
           <Dialog.Description>
             Start from a concept kit or a saved template.
@@ -133,7 +134,7 @@ export function CreateProjectDialog({
               </button>
             </div>
           </form>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

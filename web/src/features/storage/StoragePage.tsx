@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { DialogContent } from "../../components/DialogContent";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { errorMessage } from "../../api/errors";
@@ -57,7 +58,7 @@ function DeleteDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <DialogContent className="dialog">
           <Dialog.Title>Delete results of {result?.runName}</Dialog.Title>
           <Dialog.Description>
             Deletes {result?.outputs} committed outputs (
@@ -115,7 +116,7 @@ function DeleteDialog({
               Delete results
             </button>
           </div>
-        </Dialog.Content>
+        </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

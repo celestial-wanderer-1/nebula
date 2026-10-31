@@ -1,11 +1,20 @@
 import type { RouteObject } from "react-router";
-import { ConductorNetworkEditor } from "./ConductorNetworkEditor";
-import { ConductorNetworkList } from "./ConductorNetworkList";
+
+// Feature areas load lazily, each its own chunk (docs/UI.md P7).
 
 export const conductorNetworkRoutes: RouteObject[] = [
-  { path: "conductor-networks", element: <ConductorNetworkList /> },
+  {
+    path: "conductor-networks",
+    lazy: () =>
+      import("./ConductorNetworkList").then((m) => ({
+        Component: m.ConductorNetworkList,
+      })),
+  },
   {
     path: "conductor-networks/:networkId",
-    element: <ConductorNetworkEditor />,
+    lazy: () =>
+      import("./ConductorNetworkEditor").then((m) => ({
+        Component: m.ConductorNetworkEditor,
+      })),
   },
 ];

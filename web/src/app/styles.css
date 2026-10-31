@@ -136,6 +136,25 @@ input[aria-invalid="true"] {
   white-space: nowrap;
 }
 
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--accent);
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+main:focus {
+  outline: none;
+}
+
 .eyebrow {
   color: var(--accent);
   font-size: 0.875rem;

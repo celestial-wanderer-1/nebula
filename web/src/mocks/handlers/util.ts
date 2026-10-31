@@ -12,7 +12,7 @@ import type { EntityKind } from "../../gen/nebula/core/v1/entity_pb";
 import { ApiErrorSchema } from "../../gen/nebula/core/v1/errors_pb";
 import type { StoreResult } from "../store";
 import { mockSchema } from "../fixtures";
-import { MOCK_TOKEN } from "../token";
+import { acceptedToken } from "../token";
 
 export function proto<Desc extends DescMessage>(
   schema: Desc,
@@ -46,7 +46,7 @@ export async function readProto<Desc extends DescMessage>(
 
 /** The server requires the per-launch token on every request (D137). */
 export function unauthorized(request: Request) {
-  return request.headers.get("Authorization") === `Bearer ${MOCK_TOKEN}`
+  return request.headers.get("Authorization") === `Bearer ${acceptedToken()}`
     ? undefined
     : apiError(401, "unauthorized", "Missing or invalid token");
 }

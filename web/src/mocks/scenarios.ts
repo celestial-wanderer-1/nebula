@@ -8,6 +8,7 @@ import type { ClockMode } from "./clock";
 import { isScriptName } from "./runs/scripts";
 import { mockSchema } from "./fixtures";
 import { store } from "./state";
+import { setTessellationDetail } from "./tessellate";
 
 const DOUBLES = new Set([ScalarType.DOUBLE, ScalarType.FLOAT]);
 const INTEGERS = new Set([
@@ -111,6 +112,14 @@ export const scenarios = {
   /** Later attempts and Runs record this engine build (D62, D130). */
   setEngineBuild(build: string): void {
     store.engineBuild = build;
+  },
+
+  /**
+   * Meshes `factor` times finer in each direction: 8 gives the baseline
+   * geometry about 500k triangles (docs/UI.md P7 performance).
+   */
+  largeGeometry(factor = 8): void {
+    setTessellationDetail(factor);
   },
 
   /** The GPU model later attempts run on (D149). */

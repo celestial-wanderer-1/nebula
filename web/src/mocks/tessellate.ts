@@ -150,8 +150,9 @@ function revolve(
       reverse,
       points.length,
     );
-    points.push(...grid.points);
-    indices.push(...grid.indices);
+    // Not spread: a fine grid has more items than a call takes arguments.
+    for (const point of grid.points) points.push(point);
+    for (const index of grid.indices) indices.push(index);
   }
   return encodeMesh(MeshTopology.TRIANGLES, points, indices);
 }
@@ -248,10 +249,22 @@ function numberField(message: object, name: string): number {
   return typeof value === "number" ? value : 0;
 }
 
+let detail = 1;
+
+/**
+ * Multiplies the mesh resolution of every built-in shape, for performance
+ * checks on large meshes (docs/UI.md P7). A store reset restores 1.
+ */
+export function setTessellationDetail(factor: number): void {
+  detail = Math.max(1, factor);
+}
+
+const fine = (segments: number) => Math.round(segments * detail);
+
 const builders: Record<string, Builder> = {
   [CircularFilamentSchema.typeName]: (shape) => {
     const coil = anyUnpack(shape, CircularFilamentSchema)!;
-    const n = coil.segments || 128;
+    const n = fine(coil.segments || 128);
     return encodeMesh(
       MeshTopology.LINE_LOOP,
       Array.from({ length: n }, (_, i) => {
@@ -285,7 +298,7 @@ const builders: Record<string, Builder> = {
         curve.controlPoints.map(xyz),
         curve.degree,
         curve.periodic,
-        curve.segments || 128,
+        fine(curve.segments || 128),
       ),
     );
   },
@@ -293,8 +306,8 @@ const builders: Record<string, Builder> = {
   [FourierSurfaceSchema.typeName]: (shape) => {
     const surface = anyUnpack(shape, FourierSurfaceSchema)!;
     if (surface.modes.length === 0) return "A Fourier surface needs modes";
-    const np = surface.poloidalPoints || 64;
-    const nt = surface.toroidalPoints || 128;
+    const np = fine(surface.poloidalPoints || 64);
+    const nt = fine(surface.toroidalPoints || 128);
     const { points, indices } = wrappedGrid(np, nt, (u, v) =>
       fourierPoint(
         surface.modes,
@@ -321,13 +334,13 @@ const builders: Record<string, Builder> = {
           ),
         },
       ],
-      pack.segments || 128,
+      fine(pack.segments || 128),
     );
   },
 
   [ToroidalShellSchema.typeName]: (shape) => {
     const shell = anyUnpack(shape, ToroidalShellSchema)!;
-    const segments = shell.segments || 64;
+    const segments = fine(shell.segments || 64);
     const poloidal = Math.max(16, Math.round(segments / 2));
     const kappa = shell.elongation || 1;
     const ellipse = (a: number) =>
@@ -364,7 +377,7 @@ const builders: Record<string, Builder> = {
           ),
         },
       ],
-      shell.segments || 64,
+      fine(shell.segments || 64),
     );
   },
 

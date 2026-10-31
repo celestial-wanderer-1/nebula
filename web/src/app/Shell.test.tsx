@@ -43,16 +43,19 @@ describe("Shell", () => {
     renderRoute("/");
     const status = await screen.findByRole("link", { name: /2 plugins/ });
     expect(status).toHaveTextContent("1 smoke failure");
-    expect(status).toHaveAttribute("href", "/plugins");
+    expect(status).toHaveAttribute("href", "/admin/plugins");
   });
 
   it("shows project navigation inside a project", async () => {
     renderRoute("/p/p-baseline/studies");
-    const nav = screen.getByRole("navigation", { name: "Project" });
+    // Areas load lazily: the layout renders once the route has loaded.
+    const nav = await screen.findByRole("navigation", { name: "Project" });
     expect(within(nav).getByRole("link", { name: "Studies" })).toHaveClass(
       "active",
     );
-    expect(screen.getByRole("heading", { name: "Studies" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Studies" }),
+    ).toBeVisible();
     expect(
       within(nav)
         .getAllByRole("link")
@@ -73,7 +76,7 @@ describe("Shell", () => {
     ]);
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Switch project" }),
+        screen.getByRole("button", { name: /^Switch project/ }),
       ).toHaveTextContent("Tokamak baseline"),
     );
   });

@@ -1,8 +1,14 @@
 import type { RouteObject } from "react-router";
-import { RunDetail } from "./RunDetail";
-import { RunsPage } from "./RunsPage";
+
+// Feature areas load lazily, each its own chunk (docs/UI.md P7).
 
 export const runRoutes: RouteObject[] = [
-  { path: "runs", element: <RunsPage /> },
-  { path: "runs/:runId", element: <RunDetail /> },
+  {
+    path: "runs",
+    lazy: () => import("./RunsPage").then((m) => ({ Component: m.RunsPage })),
+  },
+  {
+    path: "runs/:runId",
+    lazy: () => import("./RunDetail").then((m) => ({ Component: m.RunDetail })),
+  },
 ];

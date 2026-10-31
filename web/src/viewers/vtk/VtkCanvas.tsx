@@ -9,6 +9,7 @@ import vtkColorMaps from "@kitware/vtk.js/Rendering/Core/ColorTransferFunction/C
 import vtkMapper from "@kitware/vtk.js/Rendering/Core/Mapper";
 import vtkGenericRenderWindow from "@kitware/vtk.js/Rendering/Misc/GenericRenderWindow";
 import { useEffect, useRef } from "react";
+import { endSpan, VIEW_DRAW } from "../../perf";
 import type { DecodedPiece, DecodedScene } from "../polydata";
 
 // The vtk.js canvas of the 2D contour, 3D field, Poincaré and mode-structure
@@ -131,6 +132,9 @@ export function VtkCanvas({ scene, planar, camera, onCamera }: VtkCanvasProps) {
     }
     renderer.resetCamera();
     window.getRenderWindow().render();
+    endSpan(VIEW_DRAW, {
+      points: scene.pieces.reduce((n, p) => n + p.points.length / 3, 0),
+    });
     return () => deletable.forEach((item) => item.delete());
   }, [scene, planar]);
 
