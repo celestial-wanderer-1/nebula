@@ -7,6 +7,7 @@ import { formatTime } from "../../entities/format";
 import { ProvenanceTags } from "../../entities/ProvenanceTags";
 import { shortHash } from "../../entities/references";
 import { RunActionsBar } from "../../entities/RunActionsBar";
+import { RunStaleness } from "../../entities/RunStaleness";
 import { RUN_STATE_LABELS } from "../../entities/runLabels";
 import { RunStateBadge } from "../../entities/RunStateBadge";
 import {
@@ -100,6 +101,7 @@ export function RunDetail() {
           {r.reproducibility === ReproducibilityClass.BITWISE && " · bitwise"}
           {r.queuePosition > 0 && ` · position ${r.queuePosition} in the queue`}
         </span>
+        <RunStaleness run={r} />
         {r.rerunOf && (
           <span className="muted">
             Re-run of{" "}

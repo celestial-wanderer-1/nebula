@@ -17,4 +17,5 @@ export const PROJECT_AREAS: readonly Area[] = [
   { path: "results", label: "Results", phase: "P5" },
   { path: "comparison", label: "Comparison", phase: "P6" },
   { path: "studies", label: "Studies", phase: "P6" },
+  { path: "storage", label: "Storage", phase: "P6" },
 ];

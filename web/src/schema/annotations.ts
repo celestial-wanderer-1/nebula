@@ -13,10 +13,12 @@ import {
   label,
   quantity,
   role,
+  tolerance,
   ui,
   UiHintSchema,
   type ComponentTraits,
   type Quantity,
+  type Tolerance,
   type UiHint,
 } from "../gen/nebula/core/v1/options_pb";
 
@@ -40,6 +42,32 @@ export function quantityOf(field: DescField): Quantity | undefined {
   return options && hasExtension(options, quantity)
     ? getExtension(options, quantity)
     : undefined;
+}
+
+/** Declared tolerance of an output quantity (D43), when annotated. */
+export function toleranceOf(field: DescField): Tolerance | undefined {
+  const options = field.proto.options;
+  return options && hasExtension(options, tolerance)
+    ? getExtension(options, tolerance)
+    : undefined;
+}
+
+/**
+ * Whether two values agree under a tolerance (D43): within `abs`, or within
+ * `rel` of the larger magnitude. Without a tolerance they must be equal.
+ */
+export function withinTolerance(
+  a: number,
+  b: number,
+  declared: Tolerance | undefined,
+): boolean {
+  const diff = Math.abs(a - b);
+  if (diff === 0) return true;
+  const absOk = declared?.abs !== undefined && diff <= declared.abs;
+  const relOk =
+    declared?.rel !== undefined &&
+    diff <= declared.rel * Math.max(Math.abs(a), Math.abs(b));
+  return absOk || relOk;
 }
 
 /** UI hints of a field (D87); an empty hint when not annotated. */

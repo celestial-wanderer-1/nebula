@@ -28,6 +28,7 @@ import { VersionInfoSchema } from "../../gen/nebula/core/v1/version_pb";
 import { downloadName } from "../store";
 import { store } from "../state";
 import { MOCK_BUILD_ID } from "../token";
+import { analysisHandlers } from "./analysis";
 import { entityHandlers } from "./entities";
 import { runHandlers } from "./runs";
 import { setupHandlers } from "./setup";
@@ -289,6 +290,7 @@ export const restHandlers = [
 
   ...setupHandlers,
   ...runHandlers,
+  ...analysisHandlers,
 
   // Generic entity collections last: their :segment and :id match anything.
   ...entityHandlers,

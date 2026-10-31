@@ -39,6 +39,16 @@ export const queryKeys = {
   runOutputs: (projectId: string, runId: string) =>
     [projectId, "runs", runId, "outputs"] as const,
   inputs: (projectId: string) => [projectId, "inputs", "list"] as const,
+  comparisons: (projectId: string) =>
+    [projectId, "comparisons", "list"] as const,
+  comparison: (projectId: string, id: string) =>
+    [projectId, "comparisons", id] as const,
+  studies: (projectId: string) => [projectId, "studies", "list"] as const,
+  study: (projectId: string, id: string) => [projectId, "studies", id] as const,
+  storage: (projectId: string) => [projectId, "storage"] as const,
+  dependents: (projectId: string, runId: string) =>
+    [projectId, "storage", "dependents", runId] as const,
+  settings: () => [GLOBAL, "settings"] as const,
   // The fingerprint names the inputs the mesh was built from, so each new
   // revision is a new query (D148).
   tessellation: (projectId: string, geometryId: string, fingerprint: string) =>

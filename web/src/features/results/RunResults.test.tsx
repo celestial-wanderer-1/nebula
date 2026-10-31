@@ -41,10 +41,10 @@ describe("RunResults (docs/UI.md 6.7)", () => {
     expect(view).toHaveAttribute("data-pieces", "psi,contours");
     expect(view).toHaveAttribute("data-origin", "6.2,0,0");
     expect(view).toHaveAttribute("data-scalars", "psi_n");
-    expect(screen.getByTestId("vtk-canvas")).toHaveAttribute(
-      "data-planar",
-      "true",
-    );
+    // The canvas is a lazily loaded chunk.
+    expect(
+      await screen.findByTestId("vtk-canvas", {}, { timeout: 5000 }),
+    ).toHaveAttribute("data-planar", "true");
     expect(screen.getByRole("button", { name: "2D contour" })).toHaveAttribute(
       "aria-pressed",
       "true",

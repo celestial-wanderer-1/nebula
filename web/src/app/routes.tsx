@@ -1,11 +1,16 @@
 import type { RouteObject } from "react-router";
+import { comparisonRoutes } from "../features/comparison/routes";
 import { conductorNetworkRoutes } from "../features/conductor-networks/routes";
 import { geometryRoutes } from "../features/geometry/routes";
 import { libraryRoutes } from "../features/libraries/routes";
 import { regionRoutes } from "../features/regions/routes";
+import { PluginsPage } from "../features/plugins/PluginsPage";
 import { resultRoutes } from "../features/results/routes";
 import { runRoutes } from "../features/runs/routes";
 import { scenarioRoutes } from "../features/scenarios/routes";
+import { SettingsPage } from "../features/settings/SettingsPage";
+import { storageRoutes } from "../features/storage/routes";
+import { studyRoutes } from "../features/studies/routes";
 import { workflowRoutes } from "../features/workflows/routes";
 import { ProjectBrowser } from "../features/projects/ProjectBrowser";
 import { ProjectOverview } from "../features/projects/ProjectOverview";
@@ -24,6 +29,9 @@ const builtAreas: RouteObject[] = [
   ...workflowRoutes,
   ...runRoutes,
   ...resultRoutes,
+  ...comparisonRoutes,
+  ...studyRoutes,
+  ...storageRoutes,
 ];
 const built = new Set(builtAreas.map((route) => route.path?.split("/")[0]));
 
@@ -48,14 +56,8 @@ export const routes: RouteObject[] = [
           { path: "*", element: <NotFound main={false} /> },
         ],
       },
-      {
-        path: "/plugins",
-        element: <Placeholder title="Plugins" phase="P6" main />,
-      },
-      {
-        path: "/settings",
-        element: <Placeholder title="Settings" phase="P6" main />,
-      },
+      { path: "/plugins", element: <PluginsPage /> },
+      { path: "/settings", element: <SettingsPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

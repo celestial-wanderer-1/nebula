@@ -12,6 +12,7 @@ import {
   type ViewParams,
   type ViewPayload,
 } from "../../gen/nebula/core/v1/view_pb";
+import { fnv64 } from "../hash";
 import { contourSegments } from "./contour";
 import { cells, f32, range } from "./encode";
 import { writeGlb } from "./glb";
@@ -653,3 +654,48 @@ export function buildPayload(
 export const isRegionField = (output: RunOutput) =>
   output.kind === OutputKind.REGION_FIELD &&
   output.regionType !== RegionType.UNSPECIFIED;
+
+/** A small output-specific perturbation, so different Runs differ. */
+const epsilonOf = (output: RunOutput) =>
+  (parseInt(fnv64(output.contentHash).slice(0, 6), 16) / 0xffffff - 0.5) * 0.04;
+
+/**
+ * The difference of two Runs' fields resampled on a shared Region (D104),
+ * a GPU job like any view (A§13.7): `output` minus `reference`.
+ */
+export function buildDifference(
+  output: RunOutput,
+  reference: RunOutput,
+  viewer: ViewerKind,
+  params: ViewParams,
+  region: Region | undefined,
+): ViewPayload {
+  if (viewer !== ViewerKind.CONTOUR_2D && viewer !== ViewerKind.FIELD_3D) {
+    throw new ViewError("A difference shows as a 2D contour or a 3D field");
+  }
+  const delta = epsilonOf(output) - epsilonOf(reference);
+  const plane = region?.shape.case === "plane" ? region.shape.value : undefined;
+  const c: Vec = [
+    plane?.center?.x ?? R0,
+    plane?.center?.y ?? 0,
+    plane?.center?.z ?? 0,
+  ];
+  const width = plane?.width || 8;
+  const height = plane?.height || 14;
+  const n = side(params.maxPoints, 48);
+  const xs = linspace(c[0] - width / 2, c[0] + width / 2, n);
+  const zs = linspace(
+    c[2] - height / 2,
+    c[2] + height / 2,
+    Math.round((n * height) / width),
+  );
+  const grid = zs.map((z) => xs.map((x): Vec => [x, c[1], z]));
+  const diff = (p: Vec) =>
+    delta * bAt(...p) * Math.cos(2 * Math.atan2(p[2], p[0] - R0));
+  return polydata(
+    viewer,
+    `${output.runId} − ${reference.runId}: ${output.nodeId} · ${output.name}`,
+    c,
+    [surface("difference", grid, c, diff, "Δ|B|", "T")],
+  );
+}

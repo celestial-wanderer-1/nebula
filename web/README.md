@@ -198,6 +198,43 @@ and mode-structure viewers, and Plotly (its basic bundle, without the WebGL
 traces) with charts. Headless Playwright runs draw WebGL views with software
 WebGL (SwiftShader; see `playwright.config.ts`).
 
+- `POST /projects/{p}/comparisons` takes a `CreateComparisonRequest` (Run
+  IDs of the project and a shared Region) and returns 201 with the
+  `Comparison`: scalar rows across the Runs, each with its declared
+  `tolerance` (the core `tolerance` field option) and `out_of_tolerance`,
+  and the outputs the Runs share with one `OutputRef` per Run. Fewer than
+  two Runs, or Runs of another project, return 422. `GET` lists and reads
+  them. A difference view is a `ViewRequest` with `reference` and `region`
+  set: `output` minus `reference`, resampled on the region (D104).
+- `POST /projects/{p}/studies` takes a `CreateStudyRequest` and returns 201
+  with the `Study` in `STUDY_STATE_DRAFT`, one point per combination of the
+  variables' values. The base version must be a version of the workflow
+  (422 otherwise), and `concurrency` 0 means the installed GPU count.
+  `POST .../studies/{s}/start` and `.../stop` return the `Study`. Each point
+  becomes a Run of the base version with the point's `ParameterOverride`,
+  which is part of its cache key and provenance, and with `study_id` set,
+  so its state changes reach `/ws/queue` as `run_state` events carrying the
+  study. Override paths are `nodes/{node}/config/{field}`,
+  `scenarios/{id}/currents/{circuit}/current`,
+  `scenarios/{id}/plasma_targets/{i}/{field}` and
+  `components/{id}/shape/{field}`.
+- `POST /projects/{p}/runs/{r}/rerun` with `RERUN_INPUTS_LATEST` is the
+  one-click re-run of a stale Run. A Run is stale when an input it pinned
+  has a newer head version; the client checks this against the entity
+  lists. A solved scenario is minted as a version but does not move the
+  scenario's head.
+- `GET /projects/{p}/storage` returns `StorageUsage` by `StorageClass`.
+  `POST .../storage/evict` takes an `EvictRequest` and returns
+  `EvictResponse`; primary results and logs cannot be evicted (422).
+  `GET .../storage/dependents?run={r}` lists the stored-output nodes,
+  in drafts and versions, that refer to a Run's outputs.
+  `POST .../storage/delete` takes a `DeleteResultsRequest`; with dependents
+  it needs `acknowledge_dependents`, or it returns 409 `in_use`. The Runs'
+  records stay.
+- `GET /settings` returns the read-only `Settings` (the TOML file).
+  `PUT /projects/{p}/settings` takes `ProjectSettings` and returns the
+  `Project`.
+
 ## Content Security Policy
 
 The bundle runs under a strict policy (D117): no inline or `eval`'d

@@ -58,6 +58,7 @@ import {
   ValidationIssueSchema,
   type ImportProjectResponse,
   type Project,
+  type ProjectSettings,
   type Template,
 } from "../gen/nebula/core/v1/project_pb";
 import type { QueueSummary } from "../gen/nebula/core/v1/queue_pb";
@@ -102,11 +103,32 @@ import { MockClock } from "./clock";
 import type { RunEngine } from "./runs/engine";
 import { ENGINE_BUILD, startEngine } from "./runs/service";
 import { checkGeometry, tessellateShape } from "./tessellate";
+import { ComparisonService } from "./comparisons";
+import { StorageService } from "./storage";
+import { StudyService } from "./studies";
 import { ViewService } from "./views";
 import { validateWorkflow } from "./workflows/validate";
 import { MOCK_BUILD_ID } from "./token";
 
 const EXPORT_FORMAT = "nebula-mock-export/1";
+
+const SETTINGS_TOML = `# ~/.nebula/nebula.toml (D90)
+[server]
+bind = "127.0.0.1"
+port = 8417
+
+[gpus]
+model = "MI300X"
+count = 4
+
+[storage]
+project_cap = "200 GiB"
+shared_cache_cap = "1 TiB"
+
+[logs]
+max_size = "512 MiB"
+keep_days = 30
+`;
 
 // The 8-byte signature every HDF5 file starts with.
 const HDF5_SIGNATURE = [0x89, 0x48, 0x44, 0x46, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -178,6 +200,11 @@ export class MockStore {
   engine!: RunEngine;
   /** View jobs and their payload cache (A§3.6). */
   readonly views = new ViewService(this);
+  readonly comparisons = new ComparisonService(this);
+  readonly studies = new StudyService(this);
+  readonly storage = new StorageService(this);
+  /** Installation settings, read-only in the UI (D90). */
+  settingsToml = SETTINGS_TOML;
   /** Engine build and GPU model of this installation (D126, D149). */
   engineBuild = ENGINE_BUILD;
   gpuModel = "MI300X";
@@ -217,6 +244,10 @@ export class MockStore {
     this.clock.cancelAll();
     this.engine = startEngine(this, runFixtures(), outputFixtures());
     this.views?.clear();
+    this.comparisons?.clear();
+    this.studies?.clear();
+    this.storage?.clear();
+    this.settingsToml = SETTINGS_TOML;
   }
 
   private newId(prefix: string): string {
@@ -590,6 +621,27 @@ export class MockStore {
       const geometry = ref && this.resolve(projectId, ref);
       return geometry ? [geometryOf(geometry)] : [];
     });
+  }
+
+  /** The values of a scalars output, by field name. */
+  unpackScalars(scalars: Any): Record<string, unknown> | undefined {
+    const desc = mockSchema.getMessage(typeNameOf(scalars));
+    const message = desc && anyUnpack(scalars, desc);
+    return message
+      ? (message as unknown as Record<string, unknown>)
+      : undefined;
+  }
+
+  /** PUT /projects/{p}/settings: the per-project strict cache (D78). */
+  updateProjectSettings(
+    projectId: string,
+    settings: ProjectSettings,
+  ): StoreResult<Project> {
+    const project = this.project(projectId);
+    if (!project) return notFound("Project");
+    project.settings = settings;
+    project.updatedAt = timestampNow();
+    return ok(project);
   }
 
   // Materials (A§13.2): plain resources, last write wins.

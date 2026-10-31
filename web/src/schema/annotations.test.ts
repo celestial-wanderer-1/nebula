@@ -6,11 +6,14 @@ import {
 import { mockSchema } from "../mocks/fixtures";
 import { RegionSchema } from "../gen/nebula/core/v1/region_pb";
 import { PlasmaTargetsSchema } from "../gen/nebula/core/v1/scenario_pb";
+import { EquilibriumScalarsSchema } from "../gen/nebula/core/v1/output_pb";
 import {
   componentTraitsOf,
   messageLabel,
   roleOf,
+  toleranceOf,
   unknownCoreOptions,
+  withinTolerance,
 } from "./annotations";
 
 describe("componentTraitsOf", () => {
@@ -61,5 +64,26 @@ describe("core options", () => {
       "nebula.core.v1.PlasmaTargets",
       "acme.demo.v1.DemoPlasmaTarget",
     ]);
+  });
+});
+
+describe("tolerances (D43)", () => {
+  it("reads a quantity's declared tolerance", () => {
+    expect(toleranceOf(EquilibriumScalarsSchema.field.q95!)).toMatchObject({
+      rel: 0.02,
+    });
+    expect(toleranceOf(EquilibriumScalarsSchema.field.axisR!)).toMatchObject({
+      abs: 1e-3,
+    });
+    const demo = mockSchema.getMessage("acme.demo.v1.DemoScalars")!;
+    expect(toleranceOf(demo.field.rippleMax!)).toMatchObject({ abs: 1e-4 });
+  });
+
+  it("agrees within abs or rel, and exactly without a tolerance", () => {
+    expect(withinTolerance(3.31, 3.02, { rel: 0.02 } as never)).toBe(false);
+    expect(withinTolerance(3.31, 3.3, { rel: 0.02 } as never)).toBe(true);
+    expect(withinTolerance(6.312, 6.3121, { abs: 1e-3 } as never)).toBe(true);
+    expect(withinTolerance(1, 1.0001, undefined)).toBe(false);
+    expect(withinTolerance(1, 1, undefined)).toBe(true);
   });
 });

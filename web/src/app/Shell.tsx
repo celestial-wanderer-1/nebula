@@ -101,6 +101,9 @@ export function Shell() {
         <div className="spacer" />
         <QueueIndicator />
         <PluginStatus />
+        <Link to="/settings" className="indicator">
+          Settings
+        </Link>
       </header>
       <div className="shell-body">
         <Outlet />

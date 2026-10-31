@@ -1,6 +1,7 @@
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { useEffect, useRef, useState } from "react";
 import { getTypeRegistry } from "../api/registry";
+import type { EntityRef } from "../gen/nebula/core/v1/entity_pb";
 import {
   ViewReplySchema,
   ViewRequestSchema,
@@ -38,7 +39,16 @@ export function useViewJob(
   output: OutputRef | undefined,
   viewer: ViewerKind,
   params: ViewParams,
-  postOp = "",
+  {
+    postOp = "",
+    reference,
+    region,
+  }: {
+    postOp?: string;
+    /** A difference view: `output` minus `reference` on `region` (D104). */
+    reference?: OutputRef;
+    region?: EntityRef;
+  } = {},
 ): ViewJob {
   const manager = useWsManager();
   const [job, setJob] = useState<ViewJob>({ pending: false, cached: false });
@@ -54,6 +64,8 @@ export function useViewJob(
           viewer,
           params,
           postOp,
+          reference,
+          region,
         }),
         { registry: getTypeRegistry() },
       )

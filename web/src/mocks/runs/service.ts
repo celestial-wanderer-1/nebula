@@ -25,6 +25,7 @@ import {
   ScenarioSchema,
 } from "../../gen/nebula/core/v1/scenario_pb";
 import { EquilibriumScalarsSchema } from "../../gen/nebula/core/v1/output_pb";
+import type { Study, StudyPoint } from "../../gen/nebula/core/v1/study_pb";
 import type { Node } from "../../gen/nebula/core/v1/workflow_pb";
 import {
   AttemptSchema,
@@ -116,6 +117,11 @@ export function startEngine(
   });
   engine.runs = runs;
   engine.outputs = outputs;
+  engine.onQueueEvent((event) => {
+    if (event.event.case !== "runState" || !event.event.value.studyId) return;
+    const run = engine.run(event.event.value.runId);
+    if (run) store.studies.onRunState(run);
+  });
   for (const run of runs) {
     const record = store.entity(
       run.projectId,
@@ -225,11 +231,22 @@ function scalarsOf(
     .map((any) => anyUnpack(any, PlasmaTargetsSchema))
     .find(Boolean);
   const current = targets?.plasmaCurrent || 1.5e7;
+  // Coil-current overrides of a scan (D109) shift q95 with the field.
+  const coil = Object.entries(run.overrides?.values ?? {})
+    .filter(([path]) => path.endsWith("/current"))
+    .map(([path, value]) => {
+      const circuit = path.split("/")[3];
+      const base = scenario?.currents.find(
+        (c) => c.circuitId === circuit,
+      )?.current;
+      return base ? value / base : 1;
+    })
+    .reduce((a, b) => a * b, 1);
   return anyPack(
     EquilibriumScalarsSchema,
     create(EquilibriumScalarsSchema, {
       plasmaCurrent: current,
-      q95: 3.3 * (1.5e7 / current) * (1 + jitter),
+      q95: 3.3 * (1.5e7 / current) * coil * (1 + jitter),
       betaPoloidal: (targets?.betaPoloidal || 0.64) * (1 + jitter / 10),
       internalInductance: targets?.internalInductance || 0.8,
       axisR: targets?.axisR || 6.3,
@@ -259,16 +276,17 @@ function mintSolvedScenario(
     runId,
     versionHash(EntityKind.SCENARIO, content),
   );
-  record.versions = [
-    create(VersionMetaSchema, {
-      hash,
-      mintedAt: timestampFromMs(store.clock.now()),
-      mintedBy: MintedBy.SOLVED_SCENARIO,
-      sourceId: runId,
-      draftRevision: record.draft.revision,
-    }),
-    ...record.versions,
-  ];
+  const solved = create(VersionMetaSchema, {
+    hash,
+    mintedAt: timestampFromMs(store.clock.now()),
+    mintedBy: MintedBy.SOLVED_SCENARIO,
+    sourceId: runId,
+    draftRevision: record.draft.revision,
+  });
+  // A solved scenario is a version, not the new head: references to the
+  // scenario's head do not move to it (D110).
+  const [head, ...rest] = record.versions;
+  record.versions = head ? [head, solved, ...rest] : [solved];
   record.versionContents = { ...record.versionContents, [hash]: content };
   store.publishEntity(record, ChangeType.VERSION_MINTED, hash);
 }
@@ -556,4 +574,53 @@ function collectInputs(
   };
   mapRefs(content, mockSchema.typeRegistry, visit);
   return [...found.values()];
+}
+
+/**
+ * A scan point's Run (A§12.4, D109): the Study's pinned base Workflow
+ * version with the point's override vector, which is part of the cache
+ * key, so identical points reuse results.
+ */
+export function submitPoint(
+  store: MockStore,
+  projectId: string,
+  study: Study,
+  point: StudyPoint,
+): Run | undefined {
+  const record = store.entity(projectId, EntityKind.WORKFLOW, study.workflowId);
+  const content = record?.versionContents?.[study.workflowVersionHash];
+  if (!record || !content) return undefined;
+  const workflow = unpackWorkflow(content);
+  const overrides = { ...(point.overrides?.values ?? {}) };
+  const plan = store.engine.planSteps(
+    projectId,
+    workflow,
+    study.mode,
+    overrides,
+  );
+  const project = store.project(projectId)!;
+  project.runCount += 1;
+  const inputs = collectInputs(store, projectId, content);
+  const run = create(RunSchema, {
+    id: store.engine.newRunId(),
+    projectId,
+    name: `${study.name} · point ${point.index + 1}`,
+    workflowId: study.workflowId,
+    workflowVersionHash: study.workflowVersionHash,
+    gpus: study.gpusPerRun,
+    mode: study.mode,
+    studyId: study.id,
+    overrides: { values: overrides },
+  });
+  run.provenance = provenance(
+    store,
+    projectId,
+    workflow,
+    study.workflowVersionHash,
+    inputs,
+    study.mode,
+  );
+  run.provenance.baseWorkflowVersionHash = study.workflowVersionHash;
+  run.provenance.overrides = run.overrides;
+  return store.engine.submit(run, workflow, plan);
 }

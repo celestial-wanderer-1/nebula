@@ -360,10 +360,12 @@ describe("re-runs (D62, D101)", () => {
     const run = submit(store, p, workflowId);
     until(store, run, RunState.COMPLETED);
     const scenario = store.entity(p, EntityKind.SCENARIO, "scn-flattop")!;
-    expect(scenario.versions[0]).toMatchObject({
+    // A version, not the new head (D110).
+    expect(scenario.versions[1]).toMatchObject({
       mintedBy: 3,
       sourceId: run.id,
     });
+    expect(scenario.versions[0]?.mintedBy).toBe(1);
   });
 });
 

@@ -12,7 +12,7 @@ import {
 } from "../../gen/nebula/core/v1/view_pb";
 import { contentHash } from "../hash";
 import type { MockStore } from "../store";
-import { buildPayload, ViewError } from "./builders";
+import { buildDifference, buildPayload, ViewError } from "./builders";
 
 // View jobs of the mock (A§3.6): a payload cache keyed by output, PostOp,
 // view parameters and engine build (A§4.6); hits reply at once, misses
@@ -27,6 +27,11 @@ export class ViewService {
 
   clear(): void {
     this.cache.clear();
+  }
+
+  /** Cached payloads, for storage accounting. */
+  size(): number {
+    return this.cache.size;
   }
 
   /** The reply to a view request, and how long the job takes. */
@@ -55,12 +60,26 @@ export class ViewService {
     if (output.kind === OutputKind.FIELD_OPERATOR) {
       return fail("not_viewable", "An operator output has no view");
     }
+    const reference = request.reference
+      ? this.store
+          .runOutputs(request.reference.runId)
+          .find(
+            (o) =>
+              o.nodeId === request.reference?.nodeId &&
+              o.name === request.reference.outputName,
+          )
+      : undefined;
+    if (request.reference && !reference) {
+      return fail("not_found", "Reference output not found");
+    }
     const params = request.params ?? create(ViewParamsSchema);
     const key = contentHash(
       output.contentHash,
       request.postOp,
       String(request.viewer),
       toBinary(ViewParamsSchema, params),
+      reference?.contentHash ?? "",
+      request.region?.id ?? "",
       this.store.engineBuild,
     );
     const held = this.cache.get(key);
@@ -74,9 +93,10 @@ export class ViewService {
         delayMs: 0,
       };
     }
+    // A difference resamples on the comparison's shared Region (D104).
+    const regionId = request.region?.id || output.regionId;
     const record =
-      output.regionId &&
-      this.store.entity(run.projectId, EntityKind.REGION, output.regionId);
+      regionId && this.store.entity(run.projectId, EntityKind.REGION, regionId);
     const regionContent =
       record &&
       (record.versionContents?.[record.versions[0]?.hash ?? ""] ??
@@ -86,7 +106,9 @@ export class ViewService {
       : undefined;
     let payload: ViewPayload;
     try {
-      payload = buildPayload(output, request.viewer, params, region);
+      payload = reference
+        ? buildDifference(output, reference, request.viewer, params, region)
+        : buildPayload(output, request.viewer, params, region);
     } catch (error) {
       if (error instanceof ViewError)
         return fail("not_viewable", error.message);

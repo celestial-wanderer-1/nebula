@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { useRuns } from "../../api/runs";
 import { formatTime } from "../../entities/format";
 import { ProvenanceTags } from "../../entities/ProvenanceTags";
+import { RunStaleness } from "../../entities/RunStaleness";
 import { RunStateBadge } from "../../entities/RunStateBadge";
 import { DeterminismMode } from "../../gen/nebula/core/v1/run_pb";
 import { runPath } from "./paths";
@@ -50,6 +51,7 @@ export function RunList({ projectId }: { projectId: string }) {
             <td>{formatTime(run.submittedAt)}</td>
             <td>
               <ProvenanceTags tags={run.tags} />
+              <RunStaleness run={run} compact />
             </td>
           </tr>
         ))}

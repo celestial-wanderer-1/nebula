@@ -73,7 +73,7 @@ export function ViewerHost({
     viewer !== undefined ? ref : undefined,
     viewer ?? 0,
     request,
-    descriptor?.postOp,
+    { postOp: descriptor?.postOp },
   );
 
   if (viewer === undefined) {
