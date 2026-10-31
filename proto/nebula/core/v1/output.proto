@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package nebula.core.v1;
 
+import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 import "nebula/core/v1/entity.proto";
 import "nebula/core/v1/options.proto";
@@ -54,6 +55,21 @@ message RunOutput {
   // Set when the output was reused from another Run's cache entry (D125).
   string producer_run_id = 14;
   TimeAxis time = 15;
+  // The values of a scalars output: small, so they travel inline.
+  google.protobuf.Any scalars = 16;
+}
+
+// Scalars of an equilibrium (Equilibrium.Scalars).
+message EquilibriumScalars {
+  double plasma_current = 1 [(quantity) = {unit: "A"}];
+  double q95 = 2 [(ui) = {label: "q95"}];
+  double beta_poloidal = 3 [(ui) = {label: "β poloidal"}];
+  double internal_inductance = 4 [(ui) = {label: "Internal inductance (li)"}];
+  double axis_r = 5 [
+    (quantity) = {unit: "m"},
+    (ui) = {label: "Magnetic axis R"}
+  ];
+  double stored_energy = 6 [(quantity) = {unit: "J"}];
 }
 
 message ListRunOutputsResponse {

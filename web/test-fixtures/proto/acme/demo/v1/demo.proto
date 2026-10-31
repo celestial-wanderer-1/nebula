@@ -177,3 +177,9 @@ message DemoPostOpConfig {
     (nebula.core.v1.ui) = {default_json: "360"}
   ];
 }
+
+// Scalars output of acme.demo.solver.
+message DemoScalars {
+  double ripple_max = 1 [(nebula.core.v1.quantity) = {min: 0}];
+  double field_on_axis = 2 [(nebula.core.v1.quantity) = {unit: "T"}];
+}

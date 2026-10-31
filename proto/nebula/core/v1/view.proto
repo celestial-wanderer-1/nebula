@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+package nebula.core.v1;
+
+import "google/protobuf/struct.proto";
+import "nebula/core/v1/component.proto";
+import "nebula/core/v1/errors.proto";
+import "nebula/core/v1/options.proto";
+import "nebula/core/v1/output.proto";
+import "nebula/core/v1/region.proto";
+
+// The fixed viewer catalogue of A§13.6 (D87). Plugins add no viewers; their
+// view descriptors select and configure these.
+enum ViewerKind {
+  VIEWER_KIND_UNSPECIFIED = 0;
+  // Plotly.
+  VIEWER_KIND_PROFILE_1D = 1;
+  // vtk.js.
+  VIEWER_KIND_CONTOUR_2D = 2;
+  // vtk.js: fields on grids, isosurfaces and field lines (D39).
+  VIEWER_KIND_FIELD_3D = 3;
+  // Plotly.
+  VIEWER_KIND_SPECTRUM = 4;
+  // vtk.js.
+  VIEWER_KIND_POINCARE = 5;
+  // vtk.js.
+  VIEWER_KIND_MODE_STRUCTURE = 6;
+  // Plotly (D146).
+  VIEWER_KIND_TIME_TRACE = 7;
+}
+
+// A committed output of a Run.
+message OutputRef {
+  string run_id = 1;
+  string node_id = 2;
+  string output_name = 3;
+  string content_hash = 4;
+}
+
+message SlicePlane {
+  Point3 origin = 1;
+  Vector3 normal = 2;
+}
+
+// View parameters (A§3.6). Each change is a new view request; the server
+// caches payloads by output, PostOp, parameters and build (A§4.6).
+message ViewParams {
+  // Slice of a time-series output (D146).
+  optional uint32 time_index = 1;
+  SlicePlane slice = 2;
+  repeated double isovalues = 3;
+  // Field-line seeds.
+  repeated Point3 seeds = 4;
+  // Decimation target in points; 0 for the server's default (D39).
+  uint32 max_points = 5;
+  // Field component or quantity to show, for example "B" or "psi".
+  string component = 6;
+  // Eigenmode index of a mode-structure view.
+  uint32 mode_index = 7;
+  // Toroidal angle of a Poincaré section.
+  double section_phi = 8 [(quantity) = {unit: "rad"}];
+  // Field-line transits of a Poincaré plot.
+  uint32 transits = 9;
+}
+
+// A request on /ws/views (A§3.6). request_id matches the reply.
+message ViewRequest {
+  string request_id = 1;
+  string project_id = 2;
+  OutputRef output = 3;
+  // PostOp extension that turns the output into the payload, if any.
+  string post_op = 4;
+  ViewerKind viewer = 5;
+  ViewParams params = 6;
+}
+
+// A Plotly figure: {"data": [...], "layout": {...}}.
+message PlotlyFigure {
+  google.protobuf.Struct figure = 1;
+}
+
+message VtkDataArray {
+  string name = 1;
+  uint32 components = 2;
+  // Little-endian float32 values, `components` per point.
+  bytes values = 3;
+  double range_min = 4;
+  double range_max = 5;
+  // Unit tag of the values (D46).
+  string unit = 6;
+}
+
+// vtk.js polydata, presentation only (D156): float32 points relative to the
+// payload origin, and VTK cell arrays (count, then point IDs, per cell) as
+// little-endian uint32.
+message VtkPolyData {
+  string name = 1;
+  bytes points = 2;
+  bytes verts = 3;
+  bytes lines = 4;
+  bytes polys = 5;
+  repeated VtkDataArray point_data = 6;
+  string active_scalars = 7;
+}
+
+message VtkPolyDataSet {
+  repeated VtkPolyData pieces = 1;
+}
+
+// A binary glTF. It must not reference external URIs (D117).
+message GltfAsset {
+  bytes glb = 1;
+}
+
+// A view payload: FP32 presentation data, never fed back as an input
+// (D156).
+message ViewPayload {
+  // Payload cache key (A§4.6).
+  string key = 1;
+  ViewerKind viewer = 2;
+  // Local origin of every position in the payload, in the global frame.
+  Point3 origin = 3;
+  // Time axis of a time-series output (D146).
+  TimeAxis time = 4;
+  string title = 5;
+  oneof body {
+    PlotlyFigure plotly = 10;
+    VtkPolyDataSet polydata = 11;
+    GltfAsset gltf = 12;
+  }
+}
+
+// The reply to a ViewRequest on /ws/views.
+message ViewReply {
+  string request_id = 1;
+  oneof result {
+    ViewPayload payload = 2;
+    ApiError error = 3;
+  }
+  // Served from the payload cache (A§3.6).
+  bool cached = 4;
+}
+
+// Selects and configures a catalogue viewer for a plugin's output (D87).
+message ViewDescriptor {
+  // Output port name.
+  string output = 1;
+  ViewerKind viewer = 2;
+  string post_op = 3;
+  string title = 4;
+  ViewParams defaults = 5;
+}
